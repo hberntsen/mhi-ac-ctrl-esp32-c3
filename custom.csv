@@ -1,0 +1,6 @@
+# Name,   Type, SubType, Offset,  Size, Flags
+nvs,      data, nvs,     0x9000,   16K,
+homekit,  0x40, 0,       0xd000,    4K,
+otadata,  data, ota,     0xe000,    8K,
+app0,     app,  ota_0,   0x10000, 1500K,
+app1,     app,  ota_1,          , 1500K,

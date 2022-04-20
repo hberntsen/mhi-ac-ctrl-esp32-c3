@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link id="favicon" rel="shortcut icon" type="image/png" href="data:image/png;base64,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">
+	<title>ESP</title>
+
+<style>
+html {
+	--slider-transistion-time: 1s
+}
+* {
+	box-sizing: border-box;
+}
+body {
+	background:#3498db;
+	font-family:sans-serif;
+	font-size:12px;
+	color:#777;
+}
+
+#app {
+	background:#fff;
+	max-width:460px;
+	margin:30px auto;
+	padding:30px;
+	border-radius:5px;
+}		
+
+@media screen and (max-width: 400px) {
+	body {
+		font-size:11px;
+	}
+	#app {
+		margin:15px auto;
+		padding:15px;
+	}
+}			
+h1 {
+	display: block;
+	text-align: center;
+	margin: 0;
+	padding: 5px;
+	font-size: 1.6em
+}
+h2 {
+	text-transform: uppercase;
+	color: #fff;
+	font-size: 1.2em;
+	margin: 0;
+}
+h3 {
+	margin: 0;
+	text-align: center;
+	padding: 20px 0px 20px 0px;
+}	
+.section_header {
+	background-color:#3498db;
+	border-radius: 10px 10px 0 0;
+
+	transition: border-radius 0s ease-in-out;		/* used for 'settings'. when body closes, round the bottom corners */
+}
+.section_header.closed {
+	border-radius: 10px;
+	transition: border-radius 0.5s linear var(--slider-transistion-time);
+}	
+.section_body {
+	border: 2px solid #3498db;
+	border-top: none;
+	border-radius: 0 0 10px 10px;
+}	
+.slider {
+	overflow-y: hidden;
+	max-height: 1400px;             
+	transition: max-height var(--slider-transistion-time) ease-in-out, border-bottom-width 0s;
+}
+.slider.closed {
+	max-height: 0;
+	border-bottom-width: 0px;						/* used for 'settings'. when 'section_body' closes, border is still visible */
+	transition: max-height var(--slider-transistion-time) ease-in-out, 
+				border-bottom-width 0s linear var(--slider-transistion-time);
+}	
+
+.flex_content {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-around;					/* push elements to outside on each row */
+	align-items: center;  							/* vertical alignment for all children */
+	padding: 12px;
+}
+.flex_content .break { 								/* use to break flex rows */
+	flex-basis: 100%;
+	height: 10px;
+}
+.flex_text {
+	flex-grow: 1;									/* text element to consume all available space */
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.prgbar{
+	background-color: #f1f1f1;
+	border-radius: 10px;
+	margin: 0 20px;
+	width: 40px;
+}
+.bar{
+	background-color: #3498db;
+	border-radius: 10px;
+	height: 10px;
+}
+.auth {
+	width: 20px;
+}
+.buttons {
+	flex-grow: 1;									/* as a flex item, fill the whole row */
+
+	display: flex;									/* also a flex parent */
+	justify-content: space-around;					/* push buttons to outside edges */
+}
+.buttons>*:only-child {
+	margin: 0 auto;									/* unless there is only one. then center */
+}
+.text_input {
+	flex-grow: 1;
+	padding-left:10px;
+	border: none;
+}
+.code_text {
+	font: 1em courier;
+}
+
+.flex_form_row {
+	flex-grow: 1;
+	
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-around;
+	align-items: center; 
+}
+.flex_form_cell {
+	flex-grow: 1;
+}
+.flex_form_cell.label {
+	width: 18%;
+}
+.flex_form_cell.number {
+	width:13%;
+}
+.flex_form_cell.checkbox {
+	width:13%;
+	padding-left:18px
+}
+.flex_form_cell.text {
+	width:80%;
+}
+input[type="text"] {
+	width:100%;
+	font: 0.9em courier;
+}
+input[type="number"] {
+	width:3em;
+	text-align: center;
+}
+input:invalid {
+	border-color:red;
+}
+
+ul {
+	margin: 0px;
+	padding: 0px;
+	list-style: none;
+}
+#wifi-list li {
+	border-bottom: 1px solid #888
+}
+#wifi-list ul > li:last-child {
+	border: none;
+}
+
+.click_me:hover {
+	cursor: pointer;
+}
+
+input[type="button"] {
+	flex: 0 0 100px;								/* width 100px. don't flex grow */
+
+	padding: 5px;
+	text-align: center;
+	background:#3498db;
+	-webkit-appearance: none;
+	color:#fff;
+	cursor:pointer;
+	border:0;
+}
+input[type="button"]:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+input:focus,
+select:focus,
+textarea:focus,
+button:focus {
+	outline: none;
+}
+
+.margin-top {
+	margin-top:15px;
+}	
+
+p {
+	padding: 10px;
+	text-align: center;
+	margin: 0px;
+}
+.gr {
+	color: green;
+}
+.rd {
+	color: red;
+}
+.center {
+	text-align: center;
+}
+
+.log_output_border {
+	border: 1px solid #888;
+	padding:5px;
+	margin :5px;
+	background-color: black;
+}
+#log_output {
+	font: 0.6em courier;
+	color: LightGray;
+	overflow: auto; 
+	height:100px; 
+	width: 100%;
+	white-space: pre;
+}
+#log_output::-webkit-scrollbar {
+	display: none;
+}
+
+
+/****** Modal dialog box ******/
+.modal {
+	display: flex;
+	flex-direction: column;							/* section_header and section_body - used to grow section_body to fill modal space */
+	
+	width: 350px;
+	max-width: 100%;
+	height: 250px;
+	max-height: 100%;
+	
+
+	position: fixed;
+	z-index: 100;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+
+	border-radius: 10px;
+	background: white;
+	box-shadow: 0 0 60px 10px rgba(0, 0, 0, 0.9);
+}
+.modal .buttons  {
+	margin-top:auto;								/* push buttons to bottom */
+}
+
+.modal_closed {
+	display: none;
+}
+
+.modal-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 50;
+}
+.blur {
+	-webkit-filter: blur(2px);
+	-moz-filter: blur(2px);
+	-ms-filter: blur(2px);
+	-o-filter: blur(2px);
+	filter: blur(2px);
+}			
+
+
+/****** Animated Checkbox ******/
+
+.checkbox {
+	--background: #fff;
+	--border: #D1D6EE;
+	--border-hover: #BBC1E1;
+	--border-active: #3498db;
+	--tick: #fff;
+	position: relative;
+}
+.checkbox input,
+.checkbox svg {
+	width: 18px;
+	height: 18px;
+	display: block;
+}
+.checkbox input {
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	position: relative;
+	outline: none;
+	background: var(--background);
+	border: none;
+	margin: 0;
+	padding: 0;
+	cursor: pointer;
+	border-radius: 4px;
+	-webkit-transition: box-shadow .3s;
+	transition: box-shadow .3s;
+	box-shadow: inset 0 0 0 var(--s, 1px) var(--b, var(--border));
+}
+.checkbox input:hover {
+	--s: 2px;
+	--b: var(--border-hover);
+}
+.checkbox input:checked {
+	--b: var(--border-active);
+}
+.checkbox svg {
+	pointer-events: none;
+	fill: none;
+	stroke-width: 2px;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke: var(--stroke, var(--border-active));
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 18px;
+	height: 18px;
+	-webkit-transform: scale(var(--scale, 1)) translateZ(0);
+    transform: scale(var(--scale, 1)) translateZ(0);
+}
+.checkbox.path input:checked {
+	--s: 2px;
+	-webkit-transition-delay: .4s;
+            transition-delay: .4s;
+}
+.checkbox.path input:checked + svg {
+	--a: 16.1 86.12;
+	--o: 102.22;
+}
+.checkbox.path svg {
+	stroke-dasharray: var(--a, 86.12);
+	stroke-dashoffset: var(--o, 86.12);
+	-webkit-transition: stroke-dasharray .6s, stroke-dashoffset .6s;
+	transition: stroke-dasharray .6s, stroke-dashoffset .6s;
+}
+
+
+/****** SpinKit is licensed under the MIT License. Copyright (c) 2015 Tobias Ahlin ******/
+.spinner {
+	width: 40px;
+	height: 40px;
+	position: relative;
+	margin: 0 auto;
+}
+.double-bounce1,
+.double-bounce2 {
+	width: 100%;
+	height: 100%;
+	border-radius: 50%;
+	background-color: #3498db;
+	opacity: 0.6;
+	position: absolute;
+	top: 0;
+	left: 0;
+	-webkit-animation: sk-bounce 2.0s infinite ease-in-out;
+	animation: sk-bounce 2.0s infinite ease-in-out;
+}
+.double-bounce2 {
+	-webkit-animation-delay: -1.0s;
+	animation-delay: -1.0s;
+}
+@-webkit-keyframes sk-bounce {
+	0%, 100% {
+		-webkit-transform: scale(0.0)
+	}
+	50% {
+		-webkit-transform: scale(1.0)
+	}
+}
+@keyframes sk-bounce {
+	0%, 100% {
+		transform: scale(0.0);
+		-webkit-transform: scale(0.0);
+	}
+	50% {
+		transform: scale(1.0);
+		-webkit-transform: scale(1.0);
+	}
+}
+</style>
+
+</head>
+<body>
+	<div id="app">
+		<div id="wifi" class="slider">
+			<h1>ESP HomeKit</h1>
+			<div id="wifi-status" class="slider closed">
+				<div class="section_header flex_content margin-top">
+					<h2 class="flex_text center">Connected to:</h2>
+				</div>
+				<div class="section_body flex_content">
+					<div class="flex_text center click_me"></div>	
+				</div>
+			</div>
+
+			<div id="settings" >
+				<div class="section_header flex_content margin-top closed">
+					<h2 class="flex_text center">Settings</h2>
+					<h2 class="click_me">☰</h2>
+				</div>
+				<div class="section_body slider closed" >
+					<div class="flex_content">
+						<input type='file' id='selected-file' accept=".bin" style="display:none">
+						<label id='file-input' for='selected-file'>Choose file...</label>
+						<div class="break"></div>
+						<div class="buttons">
+							<input class="update" type="button" disabled value="Update"/>
+						</div>
+						<div class="break"></div>
+						<div class="flex_text">Installed Firmware: </div><div class="code_text" id="latest_firmware"></div>
+					</div>
+					<div style="border-bottom: 1px solid #888"></div>
+					
+					<div class="flex_content">
+						<label for="reset-nvs" >Reset NVS (Wi-Fi)</label>
+							<div class="checkbox path" >
+								<input type="checkbox" id="reset-nvs">
+								<svg><use xlink:href="#check"></use></svg>
+							</div>
+						<label for="reset-homekit" >Reset HomeKit</label>
+							<div class="checkbox path" >
+								<input type="checkbox" id="reset-homekit">
+								<svg><use xlink:href="#check"></use></svg>
+							</div>
+						<div class="break"></div>
+						<div class="buttons" >
+							<input id="restart" type="button" value="Restart"/>
+						</div>
+					</div>
+					<div style="border-bottom: 1px solid #888"></div>
+					<div class="log_output_border">
+						<div id="log_output"></div>
+					</div>
+				</div>
+			</div>
+			
+			<div id="wifi-list">
+				<div class="section_header flex_content margin-top">
+					<h2 class="flex_text center">Connect to a network...</h2>
+					<h2 class="click_me">⟲</h2>
+				</div>
+				<div class="section_body">
+					<ul>
+					</ul>
+				</div>
+			</div>
+			
+		</div>
+		
+		<div id="connect" class="slider closed">
+			<h1>Enter Password</h1>
+			<div class="section_header flex_content margin-top">
+				<h2 class="flex_text center">Password for <span></span></h2>
+			</div>
+			<div class="section_body flex_content">
+				<input id="pwd" class="text_input" type="password" placeholder="Password" value="">
+				<div class="break"></div>
+				<div class="buttons">
+					<input class="cancel" type="button" value="Cancel"/>
+					<input class="join" type="button" value="Join" />
+				</div>
+			</div>
+		</div>
+		
+		<div id="connect-wait" class="slider closed">
+			<h1>Please wait...</h1>
+			<div class="section_header flex_content margin-top">
+				<h2 class="flex_text center">Connecting to <span></span></h2>
+			</div>
+			<div class="section_body flex_content">
+				<div id="loading" style="padding-top: 20px">
+					<div class="spinner"><div class="double-bounce1"></div><div class="double-bounce2"></div></div>
+					<p>Please wait while the device connects to the AP.</p>
+				</div>
+				<div id="connect-success">
+					<h3 class="gr">Success!</h3>
+					<p>The Soft AP will be disabled when the last client has disconnected from the ESP.</p>
+				</div>
+				<div id="connect-fail">
+					<h3 class="rd">Connection Failed</h3>
+					<p></p>
+				</div>
+				
+				<div class="break"></div>
+				<div class="buttons">
+					<input class="ok" type="button" value="OK" />
+				</div>
+			</div>
+		</div>
+		
+		<div id="connect-details" class="slider closed">
+			<h1></h1>
+			<div class="section_header flex_content margin-top">
+				<h2 class="flex_text center">Connection Details</h2>
+			</div>
+			<div class="section_body flex_content">
+				<div class="flex_text">IP Address:</div><div id="ip"></div>
+				<div class="break"></div>
+				<div class="flex_text">Subnet Mask:</div><div id="netmask"></div>
+				<div class="break"></div>
+				<div class="flex_text">Default Gateway:</div><div id="gw"></div>
+				<div class="break"></div>
+				<div class="buttons">
+					<input class="ok" type="button" value="OK" />
+				</div>
+			</div>
+		</div>
+	</div>
+	
+	
+	<div id="modal-overlay" class="modal-overlay modal_closed"></div> 	<! used with z-index to disable clicking under modal >
+	<div id="modal" class="modal modal_closed" >
+		<div class="section_header flex_content">
+			<h2 class="flex_text center"><span></span></h2>
+		</div>
+		<div class="section_body flex_content" style="flex-grow: 1">
+			<span></span>
+			<div class="break"></div>
+			<div class="buttons"></div>
+		</div>
+	</div>
+	
+	<svg>
+		<symbol id="check" viewBox="0 0 21 21">
+			<path d="M5,10.75 L8.5,14.25 L19.4,2.3 C18.8333333,1.43333333 18.0333333,1 17,1 L4,1 C2.35,1 1,2.35 1,4 L1,17 C1,18.65 2.35,20 4,20 L17,20 C18.65,20 20,18.65 20,17 L20,7.99769186"></path>
+		</symbol>
+	</svg>
+
+
+<script type="text/javascript">
+var selectedSSID = "";	
+var connectAttempt = false;
+var statusTimer;
+var source; // global EventSource
+
+// sets all CSS and Javascript delays to the same value for slider
+var slidertransitiontime = 0.7 
+document.querySelector("html").style.setProperty('--slider-transistion-time', slidertransitiontime + 's');
+
+// immediately request 
+refreshAP();	
+
+/****** Wi-Fi *****/
+/** Connected Wi-Fi Info **/
+document.querySelector("#wifi-status .click_me").addEventListener("click", (e) => { 
+	document.querySelector("#wifi").classList.add("closed");
+	setTimeout(function(){ document.querySelector("#connect-details").classList.remove("closed"); }, slidertransitiontime * 1000); 
+});
+
+/** Refresh AP List **/
+document.querySelector('#wifi-list .section_header .click_me').addEventListener('click', refreshAP);
+
+function refreshAP(){
+	fetch("/ap.json", {
+		cache: 'no-store',
+		headers: {
+		  'Content-Type': 'application/json'
+		},
+	}).then((response) => {
+		if (!response.ok) {
+			throw Error(response.statusText);
+		}
+		return response.json();
+	}).then((data) => {
+		var ul = document.querySelector("#wifi ul");
+		ul.innerHTML = "";
+		
+		data.forEach(function(e, idx, array) {
+			var li = document.createElement("li");
+			li.classList.add("flex_content");
+			li.classList.add("click_me");
+			
+			var div = document.createElement("div");
+			div.classList.add("flex_text");
+			div.classList.add("center");
+			div.textContent = e.ssid;
+			li.appendChild(div);
+			
+			var div = document.createElement("div");
+			div.classList.add("prgbar");
+			var progress_bar = document.createElement("div");
+			progress_bar.classList.add("bar");
+			progress_bar.style.width = Math.min((e.rssi-(-95))/((-30)-(-95))*100,100)+"%";
+			div.appendChild(progress_bar);
+			li.appendChild(div);					
+			
+			var div = document.createElement("div");
+			div.classList.add("auth");
+			div.textContent = e.auth==0?'':'🔒';
+			li.appendChild(div);
+			
+			ul.appendChild(li);
+		});
+	}).catch((error) =>  {
+		console.log(error);
+	});  				
+}
+
+/** Wi-Fi Scan List **/
+document.querySelector("#wifi-list ul").addEventListener("click", (e) => { 			
+	if(e.target && e.target.textContent != "") {
+		//this bubbles up looking for the li parent, then queries for the flex_text child underneath 
+		selectedSSID = e.target.closest(".flex_content").querySelector(".flex_text").textContent;					
+		document.querySelector("#connect h2 span").textContent = selectedSSID;
+		document.querySelector("#wifi").classList.add("closed");
+		setTimeout(function(){ document.querySelector("#connect").classList.remove("closed"); }, slidertransitiontime * 1000); 
+	}
+});		
+
+/** Connect/Join to AP **/
+document.querySelector('#connect .buttons .join').addEventListener('click', (e) => {
+	document.querySelector("#loading" ).style.display = "block";
+	document.querySelector("#connect-success" ).style.display = "none";
+	document.querySelector("#connect-fail" ).style.display = "none";
+	
+	document.querySelector("#connect-wait .ok").disabled = true;
+	document.querySelector("#connect-wait h2 span").textContent = selectedSSID;
+
+	document.querySelector("#connect").classList.add("closed");				
+	setTimeout(function(){ document.querySelector("#connect-wait").classList.remove("closed"); }, slidertransitiontime * 1000); 
+							
+	connectAttempt = true;
+	
+	fetch("/connect.json", {
+		method: 'POST',
+		cache: 'no-store',
+		headers: {
+		  'Content-Type': 'application/json'
+		},
+		body: JSON.stringify({ 
+			'ssid': selectedSSID, 
+			'password': document.querySelector("#pwd").value
+		})
+	}).then((response) =>  {
+		if (!response.ok) {
+			throw Error(response.statusText);
+		}
+	}).catch((error) =>  {
+		console.log(error);
+		
+		// Failed to get a response - probably changing AP and IP has changed
+		document.querySelector("#connect-wait .ok").disabled = false;
+		document.querySelector("#connect-fail p").textContent = "No response. You have most likely connected to the ESP via the router assigned address, and not directly to the ESP's Soft AP IP. The IP you were connected to is no longer valid."
+
+		document.querySelector("#loading" ).style.display = "none";
+		document.querySelector("#connect-success" ).style.display = "none";
+		document.querySelector("#connect-fail" ).style.display = "block";
+		
+		connectAttempt = false;
+	});
+});
+
+/****** Settings *****/
+/** Restart **/
+document.querySelector('#restart').addEventListener('click', (e) => { 
+	document.querySelector("#modal h2").textContent = "Restart";
+
+	var body = document.querySelector("#modal .section_body span");
+	var para = document.createElement("p");
+	para.textContent = "Are you sure you want to restart?";
+	body.appendChild(para);
+
+	document.querySelector("#modal").style.height = "150px";
+
+	if (document.querySelector('#reset-nvs').checked || document.querySelector('#reset-homekit').checked) {
+		var para = document.createElement("p");
+		para.textContent = "This will also reset the following;";
+		body.appendChild(para);
+		document.querySelector("#modal").style.height = "230px";
+	}
+	if (document.querySelector('#reset-nvs').checked) {
+		var div = document.createElement("div");
+		div.textContent = "NVS (Wi-Fi Settings)";
+		div.classList.add("center")
+		body.appendChild(div);
+	}
+	if (document.querySelector('#reset-homekit').checked) {
+		var div = document.createElement("div");
+		div.textContent = "HomeKit Pairing";
+		div.classList.add("center")
+		body.appendChild(div);
+	}
+	
+	var buttons = document.querySelector("#modal .section_body .buttons");
+	var cancel_button = document.createElement("input");
+	cancel_button.type = "button";
+	cancel_button.value = "Cancel";
+	cancel_button.addEventListener("click", closeModal);
+	buttons.appendChild(cancel_button);
+	var ok_button = document.createElement("input");
+	ok_button.type = "button";
+	ok_button.value = "OK";
+	ok_button.addEventListener("click", performRestart);
+	ok_button.addEventListener("click", closeModal);
+	buttons.appendChild(ok_button);
+
+	openModal();	
+});		
+
+function performRestart(){	
+	fetch("/restart.json", {
+		method: 'POST',
+		cache: 'no-store',
+		headers: {
+		  'Content-Type': 'application/json'
+		},
+		body: JSON.stringify({ 
+			'reset-nvs': document.querySelector('#reset-nvs').checked, 
+			'reset-homekit': document.querySelector('#reset-homekit').checked
+		})
+	}).then((response) =>  {
+		if (!response.ok) {
+			throw Error(response.statusText);
+		}
+	}).catch((error) =>  {
+		console.log(error);
+	});
+}
+
+/** Update OTA **/
+document.querySelector('#selected-file').addEventListener('change', (e) => {	
+	var x = document.querySelector("#selected-file");
+	var file = x.files[0];
+
+	if (file) {
+		document.querySelector('#file-input').innerHTML = file.name;
+		document.querySelector('#settings .buttons .update').disabled = false;
+	}
+	else {
+		document.querySelector('#file-input').innerHTML = "Choose file...";
+		document.querySelector('#settings .buttons .update').disabled = true;
+	}	
+});
+
+document.querySelector('#settings .buttons .update').addEventListener('click', (e) => { 
+	document.querySelector("#modal h2").textContent = "Update";
+
+	var body = document.querySelector("#modal .section_body span");
+	var para = document.createElement("p");
+	para.textContent = "Are you sure you want to update?";	
+	body.appendChild(para);
+	
+	var buttons = document.querySelector("#modal .section_body .buttons");
+	var cancel_button = document.createElement("input");
+	cancel_button.type = "button";
+	cancel_button.value = "Cancel";
+	cancel_button.addEventListener("click", closeModal);
+	buttons.appendChild(cancel_button);
+	var ok_button = document.createElement("input");
+	ok_button.type = "button";
+	ok_button.value = "OK";
+	ok_button.addEventListener("click", performUpdate);
+	buttons.appendChild(ok_button);
+	
+	document.querySelector("#modal").style.height = "150px";
+	openModal();
+});		
+
+function performUpdate(){
+	closeModal();
+	
+	document.querySelector("#modal h2").textContent = "Updating...";
+
+	var body = document.querySelector("#modal .section_body span");
+	var status = document.createElement("p");
+	status.textContent = "Beginning Update...";
+	body.appendChild(status);
+	var para = document.createElement("p");
+	para.innerHTML = "Please wait. If the update fails, check the console log for more information";
+	body.appendChild(para);
+	
+	var br = document.createElement("br");
+	body.appendChild(br);
+	
+	var div = document.createElement("div");
+	div.classList.add("prgbar");
+	div.style.width = "250px";
+	div.style.margin = "0 auto";
+	var progress_bar = document.createElement("div");
+	progress_bar.classList.add("bar");
+	progress_bar.style.width = "0%";
+	div.appendChild(progress_bar);
+	body.appendChild(div);
+	
+	var buttons = document.querySelector("#modal .section_body .buttons");
+	var ok_button = document.createElement("input");
+	ok_button.type = "button";
+	ok_button.value = "OK";
+	ok_button.addEventListener("click", closeModal);
+	buttons.appendChild(ok_button);
+	
+	document.querySelector("#modal").style.height = "300px";
+	openModal();
+
+	source.addEventListener("update", function(event) { // event: update
+		var data = JSON.parse(event.data);					
+		progress_bar.style.width = data["progress"]+"%";
+		status.textContent = data["status"];
+	});
+
+	var x = document.querySelector("#selected-file");
+	var file = x.files[0];
+
+	fetch("/update_ota", {
+		method: 'POST',
+		cache: 'no-store',
+		headers: {
+		  'Content-Type': 'application/octet-stream'
+		},
+		body: file
+	}).then((response) =>  {
+		if (!response.ok) {
+			throw Error(response.statusText);
+		}
+	}).catch((error) =>  {
+		console.log(error);
+	});
+}	
+
+/****** Server Side Events *****/
+/** Log display and Wi-Fi status updates **/
+document.addEventListener("DOMContentLoaded", function(event) {
+	// setup SSE + log messaging
+	serverSideEvents();
+	
+	// events listened to on the 'main' partition
+	source.addEventListener("status", function(event) { // event: status
+		var data = JSON.parse(event.data);					
+		document.querySelector("#wifi-status .section_body .flex_text").textContent = data["ssid"];
+		document.querySelector("#connect-details h1").textContent = data["ssid"];
+		document.querySelector("#ip").textContent = data["ip"];
+		document.querySelector("#netmask").textContent = data["netmask"];
+		document.querySelector("#gw").textContent = data["gw"];
+
+		if (data['if_status'] === true) {
+			document.querySelector("#wifi-status").classList.remove("closed");
+		} else {
+			document.querySelector("#wifi-status").classList.add("closed");					
+		}
+		if (connectAttempt === true) {
+
+			if (data["if_status"] === true) {
+				document.querySelector("#connect-wait .ok").disabled = false;
+				
+				document.querySelector("#loading" ).style.display = "none";
+				document.querySelector("#connect-success" ).style.display = "block";
+				document.querySelector("#connect-fail" ).style.display = "none";
+															
+				connectAttempt = false;
+				clearTimeout(statusTimer);
+			} else {
+				statusTimer = setTimeout(function(){ 
+					document.querySelector("#connect-wait .ok").disabled = false;
+					
+					document.querySelector("#connect-fail p").textContent = "Please double-check wifi password if any and make sure the access point has good signal."
+					
+					document.querySelector("#loading" ).style.display = "none";
+					document.querySelector("#connect-success" ).style.display = "none";
+					document.querySelector("#connect-fail" ).style.display = "block";
+					
+					connectAttempt = false;
+				}, 10000);
+			}
+		}
+	});
+	source.addEventListener("firmware", function(event) { // event: firmware
+		var data = JSON.parse(event.data);					
+		document.querySelector("#latest_firmware").textContent = data["version"];
+	});
+});
+
+/** Common SSE Startup + log messaging **/
+function serverSideEvents() {
+	if (window.EventSource == undefined) {
+		document.getElementById('log_output').innerHTML = "Your browser doesn't support Server Side Events."; 
+		return;
+	}
+	source = new EventSource('event');
+	source.onopen = function (event) {
+		document.getElementById('log_output').innerHTML += 'Connection Opened.<br>';
+	};
+	source.onerror = function (event) {
+		if (event.eventPhase == EventSource.CLOSED) {  
+			document.getElementById('log_output').innerHTML += 'Connection Closed.<br>';  
+		}
+	};
+	source.onmessage = function (event) { //onmessage is all messages without a specific event:
+		var data_str;
+		var objDiv = document.getElementById('log_output');
+		var scroll_to_bottom = false;
+		if (objDiv.scrollTop >= objDiv.scrollHeight - objDiv.clientHeight) {
+			scroll_to_bottom = true;
+		}
+
+		data_str = event.data;
+		data_str = data_str.replace("<", "&lt");
+		data_str = data_str.replace(">", "&gt");
+		data_str = data_str.replace("[0;31m", "<span style='color:red'>");
+		data_str = data_str.replace("[0;32m", "<span style='color:green'>");
+		data_str = data_str.replace("[0;33m", "<span style='color:yellow'>");
+		data_str = data_str.replace("[0m", "</span>");
+
+		objDiv.innerHTML += data_str + '<br>';
+		if (scroll_to_bottom) {
+			objDiv.scrollTop = objDiv.scrollHeight;
+		}
+	};
+}
+
+/****** Misc *****/
+/** All OK buttons within the #app go back to the main Wi-Fi screen **/
+document.querySelectorAll('#app .buttons .ok').forEach((item) => {
+	item.addEventListener('click', (e) => { 
+		document.querySelector("#connect-details").classList.add("closed");					
+		document.querySelector("#connect-wait").classList.add("closed");
+		document.querySelector("#connect").classList.add("closed");
+		setTimeout(function(){ document.querySelector("#wifi").classList.remove("closed"); }, slidertransitiontime * 1000); 
+	})
+});	
+document.querySelector('#connect .buttons .cancel').addEventListener('click', (e) => { 
+	selectedSSID = "";		
+	document.querySelector("#connect").classList.add("closed");
+	setTimeout(function(){ document.querySelector("#wifi").classList.remove("closed"); }, slidertransitiontime * 1000); 			
+});	
+
+/** Settings - hide content **/
+document.querySelector('#settings .section_header .click_me').addEventListener('click', (e) => { 
+	document.querySelector("#settings .section_body").classList.toggle("closed");	
+	document.querySelector("#settings .section_header").classList.toggle("closed");				
+});	
+
+/** Modal Functions **/		
+function openModal() {
+	document.querySelector("#modal").classList.remove("modal_closed");
+	document.querySelector("#modal-overlay").classList.remove("modal_closed");
+	document.querySelector("#app").classList.add("blur");
+}
+
+function closeModal() {
+	document.querySelector("#modal").classList.add("modal_closed");
+	document.querySelector("#modal-overlay").classList.add("modal_closed");
+	document.querySelector("#app").classList.remove("blur");
+	
+	var body = document.querySelector("#modal .section_body span");
+	body.innerHTML = "";
+	var buttons = document.querySelector("#modal .section_body .buttons");
+	buttons.innerHTML = "";		// we rely on browser to garbage collect previously bound eventlisteners.
+}
+
+
+	
+</script>
+</body>
+</html>
