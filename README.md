@@ -1,2 +1,2 @@
-# esp-idf-homekit-mitsubishi-ac
-Communicates with Mitsubishi Heat Pumps (Air Conditioners) via CN105 connector
+# esp-idf-homekit-mhi-ac
+Communicates with Mitsubishi Heavy Industries (MHI) Air Conditioners via CNS connector
