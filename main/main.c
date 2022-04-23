@@ -2,6 +2,10 @@
     Version History
     ---------------
     1.0.1   20-Apr-2023     modified header check to include 0x6c and 0x6d
+    1.0.5   20-Apr-2023     removed old update code from httpd.c
+    1.1.0   22-Apr-2023     fixed errors in miso frame creation. 
+                            sent message with value to queue.  by the time the queue was read, the characteristic 
+                            had been reset/ovrwritten so the setting would not work
 */
 
 #include "freertos/FreeRTOS.h"
@@ -45,7 +49,10 @@ static homekit_accessory_t *accessories[2];
 static TaskHandle_t mhi_poll_task_handle = NULL;
 static QueueHandle_t update_setting_queue;
 
-
+typedef struct {
+    const char *type;
+    homekit_value_t value;
+} homekit_setting_message_t;
 
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
@@ -202,20 +209,20 @@ static void mhi_poll_task(void *arg)
                 // cycle through all queued messages and create the miso frame
                 //  the message is simply the pointer to the characteristic that has requested a change
 
-                homekit_characteristic_t *message_ch = NULL;
+                homekit_setting_message_t message_ch;
 
-                while (xQueueReceive(update_setting_queue, &message_ch, 0) == pdTRUE) {
+                while (xQueueReceive(update_setting_queue, (void *)&message_ch, 0) == pdTRUE) {
 
-                    if (strcmp(message_ch->type, HOMEKIT_CHARACTERISTIC_ACTIVE) == 0) {
-                        mosi_frame[DB0] &= ~PWR_MASK;                       // clear what is there first, in case multiple messages arrive quickly
-                        miso_frame[DB0] |= message_ch->value.uint8_value;   // set the setting
+                    if (strcmp(message_ch.type, HOMEKIT_CHARACTERISTIC_ACTIVE) == 0) {
+                        miso_frame[DB0] &= ~PWR_MASK;                       // clear what is there first, in case multiple messages arrive quickly
+                        miso_frame[DB0] |= message_ch.value.uint8_value;   // set the setting
                         miso_frame[DB0] |= 1 << 1;                          // DB0[1] 'set setting bit' 
                     }
 
 
-                    if (strcmp(message_ch->type, HOMEKIT_CHARACTERISTIC_TARGET_HEATER_COOLER_STATE) == 0) {
-                        mosi_frame[DB0] &= ~MODE_MASK;                      // clear what is there first, in case multiple messages arrive quickly
-                        switch (message_ch->value.uint8_value)
+                    if (strcmp(message_ch.type, HOMEKIT_CHARACTERISTIC_TARGET_HEATER_COOLER_STATE) == 0) {
+                        miso_frame[DB0] &= ~MODE_MASK;                      // clear what is there first, in case multiple messages arrive quickly
+                        switch (message_ch.value.uint8_value)
                         {
                             case 0: //auto
                                 miso_frame[DB0] |= MODE_AUTO;
@@ -236,8 +243,8 @@ static void mhi_poll_task(void *arg)
                     }
 
 
-                    if ( strcmp(message_ch->type, HOMEKIT_CHARACTERISTIC_COOLING_THRESHOLD_TEMPERATURE) == 0 || 
-                         strcmp(message_ch->type, HOMEKIT_CHARACTERISTIC_HEATING_THRESHOLD_TEMPERATURE) == 0
+                    if ( strcmp(message_ch.type, HOMEKIT_CHARACTERISTIC_COOLING_THRESHOLD_TEMPERATURE) == 0 || 
+                         strcmp(message_ch.type, HOMEKIT_CHARACTERISTIC_HEATING_THRESHOLD_TEMPERATURE) == 0
                     ) {
                         float new_set_temp;
                         // in auto mode, both cooling (upper number) and heating (lower number) messages are sent
@@ -248,20 +255,20 @@ static void mhi_poll_task(void *arg)
                         }
                         // if not auto mode, then message_ch will have the value that was changed
                         else {
-                            new_set_temp = (message_ch->value.float_value);
+                            new_set_temp = (message_ch.value.float_value);
                         }
                         miso_frame[DB2] =  (int)( new_set_temp * 2.0 );
                         miso_frame[DB2] |= 1 << 7;
                     }
 
 
-                    if ( strcmp(message_ch->type, HOMEKIT_CHARACTERISTIC_ROTATION_SPEED) == 0 &&
-                           message_ch->value.float_value != 0.0 
+                    if ( strcmp(message_ch.type, HOMEKIT_CHARACTERISTIC_ROTATION_SPEED) == 0 &&
+                           message_ch.value.float_value != 0.0 
                     ) {
                         miso_frame[DB1] &= ~FAN_DB1_MASK;                      
                         miso_frame[DB6] &= ~FAN_DB6_MASK;                      // clear what is there first, in case multiple messages arrive quickly
 
-                        switch ( (int)(message_ch->value.float_value/25) )
+                        switch ( (int)(message_ch.value.float_value/25) )
                         {
                             case 1:         // 25.0, fan speed 1
                                 miso_frame[DB1] |= FAN_SPEED_1;
@@ -340,7 +347,8 @@ static void mhi_poll_task(void *arg)
 
         // check for errors. first byte should be 0x6c
         if ( ((mosi_frame[SB0] & 0xfe) != 0x6c) | (mosi_frame[SB1] != 0x80) | (mosi_frame[SB2] != 0x04) ) {
-            printf("packet: %5d wrong MOSI signature. 0x%02x 0x%02x 0x%02x \n", packet_cnt, mosi_frame[0], mosi_frame[1], mosi_frame[2]);
+            ESP_LOGD("mhi", "packet: %5d wrong MOSI signature. 0x%02x 0x%02x 0x%02x", 
+                        packet_cnt, mosi_frame[0], mosi_frame[1], mosi_frame[2]);
 
             frame_error = true;
 
@@ -348,7 +356,8 @@ static void mhi_poll_task(void *arg)
             homekit_characteristic_notify(custom_header_err_ch, custom_header_err_ch->value);
 
         } else if ( (mosi_frame[CBH] != (rx_checksum>>8 & 0xff)) | (mosi_frame[CBL] != (rx_checksum & 0xff)) ) {
-            printf("packet: %5d wrong MOSI checksum. calculated 0x%04x. MOSI[18]:0x%02x MOSI[19]:0x%02x \n", packet_cnt, rx_checksum, mosi_frame[18], mosi_frame[19]);
+            ESP_LOGD("mhi", "packet: %5d wrong MOSI checksum. calculated 0x%04x. MOSI[18]:0x%02x MOSI[19]:0x%02x", 
+                        packet_cnt, rx_checksum, mosi_frame[18], mosi_frame[19]);
 
             frame_error = true;
             
@@ -376,7 +385,7 @@ static void mhi_poll_task(void *arg)
 
         
         // ********************** Diagnostics ************************
-        /*
+/*        
         if (frame == 1) {
             printf("miso packet: %5d    %02x %02x %02x   %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x   %02x %02x (calc %d)  tx_checksum: %d \n", 
                 packet_cnt, 
@@ -406,7 +415,7 @@ static void mhi_poll_task(void *arg)
 
             printf("\n");
         }
-        */
+*/        
         // ***********************************************************
 
 
@@ -506,7 +515,8 @@ static void mhi_poll_task(void *arg)
                 cooling_threshold_ch->value = HOMEKIT_FLOAT(set_temp + (TEMP_THRESHOLD_DIFF/2) );
                 homekit_characteristic_notify(cooling_threshold_ch, cooling_threshold_ch->value);
 
-    ESP_LOGW(TAG, "update set temp: %2.2f, cool_th: %2.2f, heat_th: %2.2f", set_temp, cooling_threshold_ch->value.float_value, heating_threshold_ch->value.float_value);
+                ESP_LOGD("mhi", "update set temp: %2.2f, cool_th: %2.2f, heat_th: %2.2f", 
+                    set_temp, cooling_threshold_ch->value.float_value, heating_threshold_ch->value.float_value);
 
             }
 
@@ -554,7 +564,8 @@ static void mhi_poll_task(void *arg)
 
 
             // ********************** Diagnostics ************************
-            printf("packet: %5d    %02x %02x %02x   %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x   %02x %02x (calc %d)  rx_checksum: %d \n", 
+
+            ESP_LOGD("mhi", "packet: %5d    %02x %02x %02x   %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x   %02x %02x (calc %d)  rx_checksum: %d", 
                     packet_cnt, 
                 mosi_frame[0],  mosi_frame[1],  mosi_frame[2],  mosi_frame[3],  mosi_frame[4],  mosi_frame[5],  mosi_frame[6],  mosi_frame[7],  mosi_frame[8],  mosi_frame[9], 
                 mosi_frame[10], mosi_frame[11], mosi_frame[12], mosi_frame[13], mosi_frame[14], mosi_frame[15], mosi_frame[16], mosi_frame[17], mosi_frame[18], mosi_frame[19], 
@@ -562,7 +573,7 @@ static void mhi_poll_task(void *arg)
                     rx_checksum
                 );
 
-            printf("            power: %3s  mode: %5s  temp: %2.2f  set_temp: %2.2f  mhi_fan_speed: %d  state: %8s \n", 
+            ESP_LOGD("mhi", "            power: %3s  mode: %5s  temp: %2.2f  set_temp: %2.2f  mhi_fan_speed: %d  state: %8s", 
                 (mosi_frame[DB0] & PWR_MASK) ? "on" : "off", 
                 mode, 
                 current_temp, 
@@ -570,6 +581,7 @@ static void mhi_poll_task(void *arg)
                 mhi_fan_speed,
                 state
             );
+
             // ***********************************************************
 
         }
@@ -607,6 +619,8 @@ void setter_ex_update_settings(homekit_characteristic_t *_ch, homekit_value_t va
         complete
     } auto_threshold_set_state;
 
+    homekit_setting_message_t update_setting_message;
+
     // if this is a target state change, and it is going to auto mode, then update heating and cooling thresholds 
     //  immediately for better user experience
     if ( strcmp(_ch->type, HOMEKIT_CHARACTERISTIC_TARGET_HEATER_COOLER_STATE) == 0  && 
@@ -627,9 +641,8 @@ void setter_ex_update_settings(homekit_characteristic_t *_ch, homekit_value_t va
         homekit_characteristic_notify(heating_threshold_ch, heating_threshold_ch->value);
         homekit_characteristic_notify(cooling_threshold_ch, cooling_threshold_ch->value);
 
-
-    ESP_LOGW(TAG, "setter_ex   temp_threshold: %2.2f, cool_th: %2.2f, heat_th: %2.2f", 
-        temp_threshold, cooling_threshold_ch->value.float_value, heating_threshold_ch->value.float_value);
+        ESP_LOGD("mhi", "setter_ex   temp_threshold: %2.2f, cool_th: %2.2f, heat_th: %2.2f", 
+            temp_threshold, cooling_threshold_ch->value.float_value, heating_threshold_ch->value.float_value);
     }
 
 
@@ -644,11 +657,15 @@ void setter_ex_update_settings(homekit_characteristic_t *_ch, homekit_value_t va
                         cooling_threshold_ch->value = HOMEKIT_FLOAT(value.float_value + TEMP_THRESHOLD_DIFF);
                         homekit_characteristic_notify(cooling_threshold_ch, cooling_threshold_ch->value);
 
-    ESP_LOGW(TAG, "setter_ex    old_heat_th: %2.2f, new_heat_th: %2.2f, cool_th: %2.2f", 
-            _ch->value.float_value, value.float_value, cooling_threshold_ch->value.float_value);
+                        ESP_LOGD("mhi", "setter_ex    old_heat_th: %2.2f, new_heat_th: %2.2f, cool_th: %2.2f", 
+                                _ch->value.float_value, value.float_value, cooling_threshold_ch->value.float_value);
 
                         _ch->value = value;
-                        xQueueSendToBack(update_setting_queue, &_ch, 0);
+
+                        update_setting_message.type = _ch->type;
+                        update_setting_message.value = _ch->value;
+
+                        xQueueSendToBack(update_setting_queue, (void *)&update_setting_message, 0);
 
                         // if it is 'check_next', cooling_threshold was checked already, so reset back to begin
                         if ( auto_threshold_set_state == check_next ) {
@@ -678,11 +695,15 @@ void setter_ex_update_settings(homekit_characteristic_t *_ch, homekit_value_t va
                         heating_threshold_ch->value = HOMEKIT_FLOAT(value.float_value - TEMP_THRESHOLD_DIFF);
                         homekit_characteristic_notify(heating_threshold_ch, heating_threshold_ch->value);
 
-    ESP_LOGW(TAG, "setter_ex    old_cool_th: %2.2f, new_cool_th: %2.2f, heat_th: %2.2f", 
-            _ch->value.float_value, value.float_value, heating_threshold_ch->value.float_value);
+                        ESP_LOGD("mhi", "setter_ex    old_cool_th: %2.2f, new_cool_th: %2.2f, heat_th: %2.2f", 
+                                _ch->value.float_value, value.float_value, heating_threshold_ch->value.float_value);
 
                         _ch->value = value;
-                        xQueueSendToBack(update_setting_queue, &_ch, 0);
+
+                        update_setting_message.type = _ch->type;
+                        update_setting_message.value = _ch->value;
+
+                        xQueueSendToBack(update_setting_queue, (void *)&update_setting_message, 0);
 
                         // if it is 'check_next', cooling_threshold was checked already, so reset back to begin
                         if ( auto_threshold_set_state == check_next ) {
@@ -710,7 +731,10 @@ void setter_ex_update_settings(homekit_characteristic_t *_ch, homekit_value_t va
     // This is not required. Tested with iPhone and iPad open. They are both updated instantly.
     //homekit_characteristic_notify(_ch, value);
 
-    xQueueSendToBack(update_setting_queue, &_ch, 0);
+    update_setting_message.type = _ch->type;
+    update_setting_message.value = _ch->value;
+
+    xQueueSendToBack(update_setting_queue, (void *)&update_setting_message, 0);
 
 }
 
@@ -862,6 +886,8 @@ void app_main(void)
     esp_err_t err;
 
     esp_log_level_set("spi", ESP_LOG_DEBUG);      
+    esp_log_level_set("mhi", ESP_LOG_DEBUG);      
+
 
     // Initialize NVS. 
     err = nvs_flash_init();
@@ -883,7 +909,7 @@ void app_main(void)
     init_accessory();
     homekit_server_init(&config);
 
-    update_setting_queue = xQueueCreate( 10, sizeof(struct homekit_characteristic_t *) );
+    update_setting_queue = xQueueCreate( 10, sizeof(homekit_setting_message_t) );
 
     xTaskCreatePinnedToCore(
                         mhi_poll_task,          // Function to implement the task 
