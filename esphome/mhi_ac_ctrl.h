@@ -20,8 +20,8 @@ public:
 class MhiTotalEnergy : public Sensor {
 public:
     MhiTotalEnergy() {
-        this->unit_of_measurement_ = std::string("Wh");
-        this->device_class_ = std::string("energy");
+        this->unit_of_measurement_ = "Wh";
+        this->device_class_ = "energy";
         this->state_class_ = STATE_CLASS_TOTAL_INCREASING;
 
         this->total_energy_ = 0;
@@ -60,8 +60,8 @@ protected:
 class MhiPower : public Sensor {
 public:
     MhiPower() {
-        this->unit_of_measurement_ = std::string("W");
-        this->device_class_ = std::string("power");
+        this->unit_of_measurement_ = "W";
+        this->device_class_ = "power";
 
         if(mhi_ac_ctrl_core_active_mode_get()) {
             last_power = mhi_energy.get_power();
