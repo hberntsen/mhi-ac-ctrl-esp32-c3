@@ -94,10 +94,6 @@ class MhiActiveModeSwitch : public switch_::Switch {
 public:
     MhiActiveModeSwitch() {
         this->entity_category_ = ENTITY_CATEGORY_CONFIG;
-
-        bool initial_state = this->get_initial_state_with_restore_mode().value_or(true);
-        ESP_LOGI(TAG, "active mode restored to : %i", initial_state);
-        write_state(initial_state);
     }
 
     virtual void write_state(bool state) {
