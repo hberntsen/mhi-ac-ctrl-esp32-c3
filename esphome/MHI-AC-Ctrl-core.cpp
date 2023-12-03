@@ -492,14 +492,14 @@ static void mhi_poll_task(void *arg)
 
         // check for errors. first byte should be 0x6c
         if ( ((mosi_frame[SB0] & 0xfe) != 0x6c) | (mosi_frame[SB1] != 0x80) | (mosi_frame[SB2] != 0x04) ) {
-            ESP_LOGI(TAG, "packet: %5d wrong MOSI signature. 0x%02x 0x%02x 0x%02x",
+            ESP_LOGW(TAG, "packet: %5d wrong MOSI signature. 0x%02x 0x%02x 0x%02x",
                         packet_cnt, mosi_frame[0], mosi_frame[1], mosi_frame[2]);
 
 
             frame_error = true;
             //TODO: store CRC error counter for home assistant?
         } else if ( (mosi_frame[CBH] != (rx_checksum>>8 & 0xff)) | (mosi_frame[CBL] != (rx_checksum & 0xff)) ) {
-            ESP_LOGI(TAG, "packet: %5d wrong MOSI checksum. calculated 0x%04x. MOSI[18]:0x%02x MOSI[19]:0x%02x",
+            ESP_LOGW(TAG, "packet: %5d wrong MOSI checksum. calculated 0x%04x. MOSI[18]:0x%02x MOSI[19]:0x%02x",
                         packet_cnt, rx_checksum, mosi_frame[18], mosi_frame[19]);
 
             frame_error = true;
@@ -507,7 +507,7 @@ static void mhi_poll_task(void *arg)
         }
 
         if (frame_error) {
-            ESP_LOGI(TAG, "length: %i, trans len: %i",spi_slave_trans.length, spi_slave_trans.trans_len);
+            ESP_LOGW(TAG, "length: %i, trans len: %i",spi_slave_trans.length, spi_slave_trans.trans_len);
             frame_errors++;
 
             // wait a second before retrying communication
@@ -635,7 +635,7 @@ static void mhi_poll_task(void *arg)
 
             // ********************** Diagnostics ************************
 
-            ESP_LOGI(TAG, "packet: %5d    %02x %02x %02x   %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x   %02x %02x (calc %d)  rx_checksum: %d",
+            ESP_LOGD(TAG, "packet: %5d    %02x %02x %02x   %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x   %02x %02x (calc %d)  rx_checksum: %d",
                     packet_cnt,
                 mosi_frame[0],  mosi_frame[1],  mosi_frame[2],  mosi_frame[3],  mosi_frame[4],  mosi_frame[5],  mosi_frame[6],  mosi_frame[7],  mosi_frame[8],  mosi_frame[9],
                 mosi_frame[10], mosi_frame[11], mosi_frame[12], mosi_frame[13], mosi_frame[14], mosi_frame[15], mosi_frame[16], mosi_frame[17], mosi_frame[18], mosi_frame[19],
@@ -643,7 +643,7 @@ static void mhi_poll_task(void *arg)
                     rx_checksum
                 );
 
-            ESP_LOGI(TAG, "            power: %3s  mode: %5s  temp: %2.2f  set_temp: %2.2f  mhi_fan_speed: %d  state: %8s",
+            ESP_LOGD(TAG, "            power: %3s  mode: %5s  temp: %2.2f  set_temp: %2.2f  mhi_fan_speed: %d  state: %8s",
                 (mosi_frame[DB0] & PWR_MASK) ? "on" : "off",
                 mode,
                 current_temp,
@@ -659,7 +659,6 @@ static void mhi_poll_task(void *arg)
 }
 
 void mhi_ac_ctrl_core_init() {
-    ESP_LOGI(TAG, "mhi_ac_ctrl_core_init");
     miso_semaphore_handle = xSemaphoreCreateMutexStatic( &miso_semaphore_buffer );
     snapshot_semaphore_handle = xSemaphoreCreateBinaryStatic( &snapshot_semaphore_buffer );
 
