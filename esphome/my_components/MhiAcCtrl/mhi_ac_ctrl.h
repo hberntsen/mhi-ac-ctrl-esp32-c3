@@ -1,12 +1,24 @@
 #include "MHI-AC-Ctrl-core.h"
-#include "esphome.h"
+
+#include "esphome/components/climate/climate.h"
+#include "esphome/components/sensor/sensor.h"
+#ifdef USE_SWITCH
+#include "esphome/components/switch/switch.h"
+#endif
+
+
+using namespace esphome;
+using namespace esphome::climate;
+using namespace esphome::sensor;
+#ifdef USE_SWITCH
+using namespace esphome::switch_;
+#endif
 
 static const char* TAG = "mhi_ac_ctrl";
 
 class MhiFrameErrors : public Sensor {
 public:
     MhiFrameErrors() {
-        this->state_class_ = STATE_CLASS_TOTAL_INCREASING;
         this->publish_state(mhi_ac_ctrl_core_frame_errors_get());
     }
 
@@ -20,10 +32,6 @@ public:
 class MhiTotalEnergy : public Sensor {
 public:
     MhiTotalEnergy() {
-        this->unit_of_measurement_ = "Wh";
-        this->device_class_ = "energy";
-        this->state_class_ = STATE_CLASS_TOTAL_INCREASING;
-
         this->total_energy_ = 0;
 #if STORE_POWER_IN_PREFERENCES
         this->pref_ = global_preferences->make_preference<uint64_t>(this->get_object_id_hash());
@@ -60,9 +68,6 @@ protected:
 class MhiPower : public Sensor {
 public:
     MhiPower() {
-        this->unit_of_measurement_ = "W";
-        this->device_class_ = "power";
-
         if(mhi_ac_ctrl_core_active_mode_get()) {
             last_power = mhi_energy.get_power();
             this->publish_power();
@@ -89,18 +94,15 @@ protected:
     uint32_t last_power;
 };
 
-
-class MhiActiveModeSwitch : public switch_::Switch {
-public:
-    MhiActiveModeSwitch() {
-        this->entity_category_ = ENTITY_CATEGORY_CONFIG;
-    }
-
+#ifdef USE_SWITCH
+class MhiActiveMode : public switch_::Switch {
+protected:
     virtual void write_state(bool state) {
         mhi_ac_ctrl_core_active_mode_set(state);
         this->publish_state(state);
     }
 };
+#endif
 
 #ifdef USE_SELECT
 class MhiVanes : public select::Select {
@@ -166,10 +168,6 @@ public:
             //this->fan_mode = climate::CLIMATE_FAN_AUTO;
             //this->swing_mode = climate::CLIMATE_SWING_OFF;
         }
-        active_mode.set_icon("mdi:connection");
-
-        fan_raw.set_icon("mdi:fan");
-        fan_old.set_icon("mdi:fan");
 
         //current_power.set_icon("mdi:current-ac");
         //current_power.set_unit_of_measurement("A");
@@ -186,9 +184,12 @@ public:
             return;
         }
 
-        total_energy.loop();
-        power.loop();
-        frame_errors.loop();
+        if(total_energy_sensor_)
+            total_energy_sensor_->loop();
+        if(power_sensor_)
+            power_sensor_->loop();
+        if(frame_errors_sensor_)
+            frame_errors_sensor_->loop();
 #ifdef USE_SELECT
         vanes.loop();
 #endif
@@ -268,11 +269,12 @@ public:
                 default:
                     break;
             }
-            fan_raw.publish_state(mhi_ac_ctrl_core_fan_get_raw());
+            if(fan_raw_sensor_)
+                fan_raw_sensor_->publish_state(mhi_ac_ctrl_core_fan_get_raw());
         }
 
-        if(mhi_ac_ctrl_core_fan_old_changed()) {
-            fan_old.publish_state((uint8_t)mhi_ac_ctrl_core_fan_old_get());
+        if(fan_old_sensor_ && mhi_ac_ctrl_core_fan_old_changed()) {
+            fan_old_sensor_->publish_state((uint8_t)mhi_ac_ctrl_core_fan_old_get());
         }
 
         if(mhi_ac_ctrl_core_current_temperature_changed()) {
@@ -294,32 +296,6 @@ public:
     {
     }
 
-    std::vector<Switch *> get_switches() {
-        return {
-            &active_mode,
-        };
-    }
-
-    std::vector<Sensor *> get_sensors() {
-        return {
-            &fan_raw,
-            &fan_old,
-            &total_energy,
-            &power,
-            &frame_errors
-            //&error_code_,
-            //&outdoor_temperature_,
-            //&return_air_temperature_,
-            //&outdoor_unit_fan_speed_,
-            //&indoor_unit_fan_speed_,
-            //&current_power_,
-            //&compressor_frequency_,
-            //&indoor_unit_total_run_time_,
-            //&compressor_total_run_time_,
-            //&vanes_pos_
-        };
-    }
-
 #ifdef USE_SELECT
     std::vector<Select *> get_selects() {
         return {
@@ -328,15 +304,7 @@ public:
     }
 #endif
 
-    /*
-    std::vector<BinarySensor *> get_binary_sensors() {
-        return { &defrost_ };
-    }
-    */
-
 protected:
-
-
     /// Transmit the state of this climate controller.
     void control(const climate::ClimateCall& call) override
     {
@@ -439,12 +407,37 @@ protected:
     const float temperature_step_ { 1.0f };
     const std::string custom_fan_ultra_low = std::string("Ultra Low");
 
-    MhiActiveModeSwitch active_mode;
-    Sensor fan_raw;
-    Sensor fan_old;
-    MhiTotalEnergy total_energy;
-    MhiPower power;
-    MhiFrameErrors frame_errors;
+    SUB_SENSOR(fan_raw)
+    SUB_SENSOR(fan_old)
+
+protected:
+#ifdef USE_SWITCH
+    MhiActiveMode *active_mode_switch_;
+#endif
+    MhiFrameErrors *frame_errors_sensor_;
+    MhiTotalEnergy *total_energy_sensor_;
+    MhiPower *power_sensor_;
+
+public:
+#ifdef USE_SWITCH
+    void set_active_mode_switch(MhiActiveMode *s) {
+        this->active_mode_switch_ = s;
+    }
+#endif
+
+    void set_frame_errors_sensor(MhiFrameErrors *sensor) {
+        this->frame_errors_sensor_ = sensor;
+    }
+
+    void set_total_energy_sensor(MhiTotalEnergy *sensor) {
+        this->total_energy_sensor_ = sensor;
+    }
+
+    void set_power_sensor(MhiPower *sensor) {
+        this->power_sensor_ = sensor;
+    }
+
+
 #ifdef USE_SELECT
     MhiVanes vanes;
 #endif

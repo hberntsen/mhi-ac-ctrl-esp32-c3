@@ -1,17 +1,17 @@
 substitutions:
+  mhi_device_id: "mhi_ac_example"
   # Unique device ID in HA
-  deviceid: "ac_example"
+  device_id: "ac_example"
   # Unique device name in HA (sensor names will be prefixed by this name)
-  devicename: "AC Example"
+  device_name: "AC Example"
 
 esphome:
   name: ac-example
   platformio_options:
     board_build.flash_mode: dio
-  includes:
-    - mhi_ac_ctrl.h
-    - MHI-AC-Ctrl-core.h
-    - MHI-AC-Ctrl-core.cpp
+
+external_components:
+  - source: my_components
 
 esp32:
   board: esp32-c3-devkitm-1
@@ -22,25 +22,37 @@ esp32:
 logger:
   level: DEBUG
 
+MhiAcCtrl:
+  id: ${mhi_device_id}
+
 climate:
-  - platform: custom
-    lambda: |-
-      auto mhi_ac_ctrl = new MhiAcCtrl();
-      App.register_component(mhi_ac_ctrl);
-      return {mhi_ac_ctrl};
-    climates:
-      - name: "${devicename}"
-        id: ${deviceid}
+  - platform: MhiAcCtrl
+    mhi_ac_ctrl_id: ${mhi_device_id}
+    id: ${device_id}
+    name: "${device_name}"
 
 # awaiting https://github.com/esphome/feature-requests/issues/2066
 #select:
   #- platform: custom
     #lambda: |-
-      #return ((MhiAcCtrl*)id(${deviceid}))->get_selects();
+      #return ((MhiAcCtrl*)id(${device_id}))->get_selects();
     #selects:
-      #- name: ${devicename} Vanes
+      #- name: ${device_name} Vanes
 
 sensor:
+  - platform: MhiAcCtrl
+    mhi_ac_ctrl_id: ${mhi_device_id}
+    fan_raw:
+      name: ${device_name} fan raw
+    fan_old:
+      name: ${device_name} fan old
+    total_energy:
+      name: ${device_name} Energy
+    power:
+      name: ${device_name} Power
+    frame_errors:
+      name: ${device_name} Frame errors
+
   - platform: homeassistant
     name: "Voltage"
     entity_id: sensor.voltage_l3
@@ -48,39 +60,12 @@ sensor:
       then:
         - lambda: 'mhi_energy.set_voltage(x);'
 
-  - platform: custom
-    lambda: |-
-      return ((MhiAcCtrl*)id(${deviceid}))->get_sensors();
-    # Sensor names in HA, you can change these if you want
-    # Don't delete them or change their position in the list
-    sensors:
-      - name: ${devicename} fan raw
-      - name: ${devicename} fan old
-      - name: ${devicename} Energy
-      - name: ${devicename} Power
-      - name: ${devicename} Frame errors
-      #- name: ${devicename} error code
-      #- name: ${devicename} outdoor temperature
-      #- name: ${devicename} return air temperature
-      #- name: ${devicename} outdoor unit fan speed
-      #- name: ${devicename} indoor unit fan speed
-      #- name: ${devicename} current power
-      #- name: ${devicename} compressor frequency
-      #- name: ${devicename} indoor unit total run time
-      #- name: ${devicename} compressor total run time
-      #- name: ${devicename} vanes
-
 switch:
-  - platform: custom
-    lambda: |-
-      return ((MhiAcCtrl*)id(${deviceid}))->get_switches();
-    # Switch names in HA, you can change these if you want
-    # Don't delete them or change their position in the list
-    switches:
-      - name: ${devicename} Active mode
-        id: ${deviceid}_active_mode
-        # TODO: this does not work!?
-        restore_mode: ALWAYS_ON
+  - platform: MhiAcCtrl
+    mhi_ac_ctrl_id: ${mhi_device_id}
+    active_mode:
+      name: ${device_name} Active mode
+      id: ${device_id}_active_mode
 
 
 # Stop communications to AC when we're offline
@@ -93,9 +78,9 @@ switch:
         #condition:
           #api.connected:
         #then:
-          #- switch.turn_on: ${deviceid}_active_mode
+          #- switch.turn_on: ${device_id}_active_mode
         #else:
-          #- switch.turn_off: ${deviceid}_active_mode
+          #- switch.turn_off: ${device_id}_active_mode
 
 
 status_led:
