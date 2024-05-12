@@ -55,10 +55,6 @@
 #define MHI_NUM_FRAMES_PER_INTERVAL 20              // every 20 frames, MISO_frame[DB14] bit2 toggles
 
 
-enum class ErrMsg {   // Error message enum
-   err_msg_valid_frame = 0, err_msg_invalid_signature = -1, err_msg_invalid_checksum = -2, err_msg_timeout_SCK_low = -3, err_msg_timeout_SCK_high = -4
-};
-
 enum class ACType {   // Type enum
    type_status = 0x40, type_opdata = 0x80, type_erropdata = 0xc0
 };
