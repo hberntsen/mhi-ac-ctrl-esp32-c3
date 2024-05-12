@@ -54,6 +54,7 @@
 
 #define MHI_NUM_FRAMES_PER_INTERVAL 20              // every 20 frames, MISO_frame[DB14] bit2 toggles
 
+namespace mhi_ac {
 
 enum class ACPower {
    power_off = 0,
@@ -199,3 +200,4 @@ protected:
 
 extern MHIEnergy mhi_energy;
 
+} // namespace mhi_ac

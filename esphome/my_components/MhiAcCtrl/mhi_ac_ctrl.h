@@ -13,6 +13,7 @@ using namespace esphome::sensor;
 #ifdef USE_SWITCH
 using namespace esphome::switch_;
 #endif
+using namespace mhi_ac;
 
 static const char* TAG = "mhi_ac_ctrl";
 

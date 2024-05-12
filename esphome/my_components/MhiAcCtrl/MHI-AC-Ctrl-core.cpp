@@ -15,6 +15,8 @@
 #include "esp_log.h"
 static const char *TAG = "MHI-AC-CTRL-core";
 
+using namespace mhi_ac;
+
 
 #define vTaskDelayMs(ms)            vTaskDelay((ms)/portTICK_PERIOD_MS)
 
@@ -40,6 +42,7 @@ static uint8_t mosi_frame_snapshot[DB14];
 static uint8_t mosi_frame_snapshot_prev[DB14];
 static uint32_t frame_errors = 0;
 
+namespace mhi_ac {
 MHIEnergy mhi_energy(230);
 
 
@@ -672,3 +675,4 @@ void mhi_ac_ctrl_core_init() {
                         1);                     // Core where the task should run
 
 }
+} //namespace mhi_ac
