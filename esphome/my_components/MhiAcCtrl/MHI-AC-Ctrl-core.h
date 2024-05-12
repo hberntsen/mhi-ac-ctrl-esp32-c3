@@ -55,10 +55,6 @@
 #define MHI_NUM_FRAMES_PER_INTERVAL 20              // every 20 frames, MISO_frame[DB14] bit2 toggles
 
 
-enum class ACType {   // Type enum
-   type_status = 0x40, type_opdata = 0x80, type_erropdata = 0xc0
-};
-
 /*
 enum ACStatus { // Status enum
    status_power = type_status, status_mode, status_fan, status_vanes, status_troom, status_tsetpoint, status_errorcode,
