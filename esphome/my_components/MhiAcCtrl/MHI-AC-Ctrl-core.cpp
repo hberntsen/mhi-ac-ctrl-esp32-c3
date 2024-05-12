@@ -16,6 +16,7 @@
 static const char *TAG = "MHI-AC-CTRL-core";
 
 using namespace mhi_ac;
+using namespace mhi_ac::internal;
 
 
 #define vTaskDelayMs(ms)            vTaskDelay((ms)/portTICK_PERIOD_MS)
@@ -397,7 +398,7 @@ static void mhi_poll_task(void *arg)
 
     gpio_set_level(GPIO_NUM_3, 0);
 
-    //Set up a transaction of 20 bytes to send/receive
+    //Set up a transaction of MHI_FRAME_LEN bytes to send/receive
     spi_slave_trans.length = MHI_FRAME_LEN*8;
     spi_slave_trans.tx_buffer = sendbuf;
     spi_slave_trans.rx_buffer = recvbuf;

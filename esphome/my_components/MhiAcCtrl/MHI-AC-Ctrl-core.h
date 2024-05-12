@@ -3,7 +3,8 @@
 #include <atomic>
 #include "esp_timer.h"
 
-// pin defintions
+// # Config
+// ## pin defintions
 #define GPIO_MOSI                   7
 #define GPIO_MISO                   2
 #define GPIO_SCLK                   GPIO_NUM_6
@@ -12,25 +13,9 @@
 
 #define RCV_HOST                    SPI2_HOST
 
-// constants for the frame
-#define SB0                         0
-#define SB1                         1
-#define SB2                         2
-#define DB0                         3     // mode DB0[4:2]
-#define DB1                         4     // fan speed [1-3]
-#define DB2                         5     // set room temp DB2[6:0]. T[°C]=DB2[6:0]/2 The resolution is 0.50°C
-#define DB3                         6     // room temp DB3[7:0]. T[°C]=(DB3[7:0]-61)/4 The resolution is 0.25°C
-#define DB6                         9     // fan speed 4 DB6[6]
-#define DB9                         12
-#define DB10                        13
-#define DB11                        14
-#define DB12                        15
-#define DB13                        16    // compressor status. DB13[0] AC is on, DB13[1] AC is in heat mode, DB13[2]  compressor running/idle
-#define DB14                        17    // used on MISO toggle clock bit every 20 frames
-#define CBH                         18
-#define CBL                         19
 #define MHI_FRAME_LEN               20
 
+// constants for the frame
 #define MODE_MASK                   0x1C    // auto=0 in homekit        //DB0
 #define MODE_AUTO                   0x00
 #define MODE_DRY                    0x04
@@ -199,5 +184,28 @@ protected:
 };
 
 extern MHIEnergy mhi_energy;
+
+namespace internal {
+    enum FrameIndices {
+        SB0 = 0,
+        SB1 = 1,
+        SB2 = 2,
+        DB0 = 3, ///< mode DB0[4:2]
+        DB1 = 4, ///< fan speed [1-3]
+        DB2 = 5, ///< set room temp DB2[6:0]. T[°C]=DB2[6:0]/2 The resolution is 0.50°C
+        DB3 = 6, ///< room temp DB3[7:0]. T[°C]=(DB3[7:0]-61)/4 The resolution is 0.25°C
+        DB6 = 9, ///< fan speed 4 DB6[6]
+        DB9 = 12,
+        DB10 = 13,
+        DB11 = 14,
+        DB12 = 15,
+        DB13 = 16, ///< compressor status. DB13[0] AC is on, DB13[1] AC is in heat mode, DB13[2]  compressor running/idle
+        DB14 = 17, ///< used on MISO toggle clock bit every 20 frames
+        CBH = 18,
+        CBL = 19,
+        FRAME_LEN = MHI_FRAME_LEN
+    };
+
+} // namespace internal
 
 } // namespace mhi_ac
