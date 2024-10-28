@@ -59,7 +59,7 @@ static bool IRAM_ATTR timer_group_isr_callback(void *args)
     esp_err_t err;
     BaseType_t xHigherPriorityTaskWoken;
     // Trigger Chip Select
-    gpio_set_level(GPIO_NUM_9, 1);
+    gpio_set_level(GPIO_CS_OUT, 1);
     if(ready) {
         spi_slave_transaction_t *t = (spi_slave_transaction_t *) args;
         err = spi_slave_queue_trans(RCV_HOST, t, 0);
@@ -69,7 +69,7 @@ static bool IRAM_ATTR timer_group_isr_callback(void *args)
         //gpio_set_level(GPIO_NUM_3, gpio_status);
     //}
     //gpio_status = 1-gpio_status;
-    gpio_set_level(GPIO_NUM_9, 0);
+    gpio_set_level(GPIO_CS_OUT, 0);
     //timer_set_counter_value(TIMER_GROUP_0, TIMER_0, 0);
     //timer_set_alarm(TIMER_GROUP_0, TIMER_0, TIMER_ALARM_EN);
     //timer_start(TIMER_GROUP_0, TIMER_0);
@@ -476,7 +476,7 @@ static void mhi_poll_task(void *arg)
         // timer and gpio interrupt are not required until next cycle
         //timer_pause(TIMER_GROUP_0, TIMER_0);
         //gpio_intr_disable(GPIO_SCLK);
-        //gpio_set_level(GPIO_NUM_9, 1);
+        //gpio_set_level(GPIO_CS_OUT, 1);
 
         rx_checksum = 0;
         for (uint8_t byte_cnt = 0; byte_cnt < MHI_FRAME_LEN; byte_cnt++) {
