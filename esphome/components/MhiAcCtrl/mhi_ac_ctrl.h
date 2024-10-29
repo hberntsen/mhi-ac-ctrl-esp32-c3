@@ -124,7 +124,7 @@ public:
         } else if(vanes == traits.get_options()[4]) {
             mhi_ac_ctrl_core_vanes_updown_set(ACVanes::vanes_4);
         } else {
-            ESP_LOGW(TAG, "Unknown vanes mode received: %s", value);
+            ESP_LOGW(TAG, "Unknown vanes mode received: %s", value.c_str());
         }
     }
 
@@ -360,7 +360,7 @@ protected:
             if(fan_mode == custom_fan_ultra_low) {
                 mhi_ac_ctrl_core_fan_set(ACFan::speed_1);
             } else {
-                ESP_LOGW(TAG, "Unsupported custom fan mode: %s", fan_mode);
+                ESP_LOGW(TAG, "Unsupported custom fan mode: %s", fan_mode.c_str());
             }
         } else if (call.get_fan_mode().has_value()) {
             auto fan_mode = *call.get_fan_mode();
