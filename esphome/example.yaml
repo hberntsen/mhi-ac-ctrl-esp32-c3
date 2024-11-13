@@ -11,7 +11,7 @@ esphome:
     board_build.flash_mode: dio
 
 external_components:
-  - source: my_components
+  - source: components
 
 esp32:
   board: esp32-c3-devkitm-1
