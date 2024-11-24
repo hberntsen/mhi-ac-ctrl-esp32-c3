@@ -52,12 +52,12 @@ sensor:
     frame_errors:
       name: ${device_name} Frame errors
 
-  - platform: homeassistant
-    name: "Voltage"
-    entity_id: sensor.voltage_l3
-    on_value:
-      then:
-        - lambda: 'mhi_energy.set_voltage(x);'
+#  - platform: homeassistant
+#    name: "Voltage"
+#    entity_id: sensor.voltage_l3
+#    on_value:
+#      then:
+#        - lambda: 'mhi_energy.set_voltage(x);'
 
 switch:
   - platform: MhiAcCtrl
