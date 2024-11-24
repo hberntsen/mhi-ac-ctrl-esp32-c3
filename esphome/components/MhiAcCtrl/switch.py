@@ -33,7 +33,6 @@ async def setup_conf(config, key, hub):
     if key in config:
         conf = config[key]
         sens = await switch.new_switch(conf)
-        cg.add(getattr(hub, f"set_{key}_switch")(sens))
 
 
 async def to_code(config):

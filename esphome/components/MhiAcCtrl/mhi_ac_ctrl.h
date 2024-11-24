@@ -412,20 +412,11 @@ protected:
     SUB_SENSOR(fan_old)
 
 protected:
-#ifdef USE_SWITCH
-    MhiActiveMode *active_mode_switch_;
-#endif
     MhiFrameErrors *frame_errors_sensor_;
     MhiTotalEnergy *total_energy_sensor_;
     MhiPower *power_sensor_;
 
 public:
-#ifdef USE_SWITCH
-    void set_active_mode_switch(MhiActiveMode *s) {
-        this->active_mode_switch_ = s;
-    }
-#endif
-
     void set_frame_errors_sensor(MhiFrameErrors *sensor) {
         this->frame_errors_sensor_ = sensor;
     }
