@@ -51,7 +51,6 @@ static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
     timer_set_counter_value(TIMER_GROUP_0, TIMER_0, 0);
     timer_set_alarm(TIMER_GROUP_0, TIMER_0, TIMER_ALARM_EN);
-    //timer_start(TIMER_GROUP_0, TIMER_0);
 }
 
 static bool IRAM_ATTR timer_group_isr_callback(void *args)
@@ -65,9 +64,6 @@ static bool IRAM_ATTR timer_group_isr_callback(void *args)
         err = spi_slave_queue_trans(RCV_HOST, t, 0);
     }
     gpio_set_level(GPIO_CS_OUT, 0);
-    //timer_set_counter_value(TIMER_GROUP_0, TIMER_0, 0);
-    //timer_set_alarm(TIMER_GROUP_0, TIMER_0, TIMER_ALARM_EN);
-    //timer_start(TIMER_GROUP_0, TIMER_0);
     return false;
 }
 
@@ -441,14 +437,6 @@ static void mhi_poll_task(void *arg)
             sendbuf[CBL] = tx_checksum;
         }
 
-        // reset timer and enable alarm (alarm disables after it has triggered once)
-        //timer_set_counter_value(TIMER_GROUP_0, TIMER_0, 0);
-        //timer_set_alarm(TIMER_GROUP_0, TIMER_0, TIMER_ALARM_EN);
-        //timer_start(TIMER_GROUP_0, TIMER_0);
-
-        // enable the interrupt which will reset the timer counter to 0 every time it goes LOW
-        //gpio_intr_enable(GPIO_SCLK);
-
 
         // blocking function waiting for the spi results. the hardware timer must reach 20ms and perform an spi transaction
         //  we can get the data directly from 'spi_slave_trans' instead of 'spi_slave_trans_out->'
@@ -459,11 +447,6 @@ static void mhi_poll_task(void *arg)
         if(err) {
             ESP_LOGE(TAG, "get_trans_result error: %i", err);
         }
-
-        // timer and gpio interrupt are not required until next cycle
-        //timer_pause(TIMER_GROUP_0, TIMER_0);
-        //gpio_intr_disable(GPIO_SCLK);
-        //gpio_set_level(GPIO_CS_OUT, 1);
 
         rx_checksum = 0;
         for (uint8_t byte_cnt = 0; byte_cnt < MHI_FRAME_LEN; byte_cnt++) {
