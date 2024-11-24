@@ -5,6 +5,9 @@
 #ifdef USE_SWITCH
 #include "esphome/components/switch/switch.h"
 #endif
+#ifdef USE_SELECT
+#include "esphome/components/select/select.h"
+#endif
 
 
 using namespace esphome;
@@ -106,50 +109,51 @@ protected:
 #endif
 
 #ifdef USE_SELECT
-class MhiVanes : public select::Select {
+class MhiVanesUD : public select::Select {
 public:
-    MhiSwingMode() {
-        traits.set_options({ "Swing", "1", "2", "3", "4" });
-    }
+    // Select options must match the ones in the select.py Python code
 
     virtual void control(const std::string &value) {
-        if(value == traits.get_options()[0]) {
-            mhi_ac_ctrl_core_vanes_updown_set(ACVanes::swing);
-        } else if(vanes == traits.get_options()[1]) {
-            mhi_ac_ctrl_core_vanes_updown_set(ACVanes::vanes_1);
-        } else if(vanes == traits.get_options()[2]) {
-            mhi_ac_ctrl_core_vanes_updown_set(ACVanes::vanes_2);
-        } else if(vanes == traits.get_options()[3]) {
-            mhi_ac_ctrl_core_vanes_updown_set(ACVanes::vanes_3);
-        } else if(vanes == traits.get_options()[4]) {
-            mhi_ac_ctrl_core_vanes_updown_set(ACVanes::vanes_4);
+        if(value == "Swing") {
+            mhi_ac_ctrl_core_vanes_updown_set(ACVanes::Swing);
+        } else if(value == "Up") {
+            mhi_ac_ctrl_core_vanes_updown_set(ACVanes::Up);
+        } else if(value == "Up/Center") {
+            mhi_ac_ctrl_core_vanes_updown_set(ACVanes::UpCenter);
+        } else if(value == "Center/Down") {
+            mhi_ac_ctrl_core_vanes_updown_set(ACVanes::CenterDown);
+        } else if(value == "Down") {
+            mhi_ac_ctrl_core_vanes_updown_set(ACVanes::Down);
         } else {
-            ESP_LOGW(TAG, "Unknown vanes mode received: %s", value.c_str());
+            ESP_LOGW(TAG, "Unknown vanes_ud mode received: %s", value.c_str());
         }
     }
 
     void loop() {
-        if(mhi_ac_ctrl_core_vanes_updown_changed()) {
+        if(mhi_ac_ctrl_core_vanes_updown_changed() || !has_state()) {
             switch (mhi_ac_ctrl_core_vanes_updown_get()) {
-                case ACVanes::swing:
-                    publish_state(traits.get_options()[0]);
+                case ACVanes::Swing:
+                    publish_state("Swing");
                     break;
-                case ACVanes::vanes_1:
-                    publish_state(traits.get_options()[1]);
+                case ACVanes::Up:
+                    publish_state("Up");
                     break;
-                case ACVanes::vanes_2:
-                    publish_state(traits.get_options()[2]);
+                case ACVanes::UpCenter:
+                    publish_state("Up/Center");
                     break;
-                case ACVanes::vanes_3:
-                    publish_state(traits.get_options()[3]);
+                case ACVanes::CenterDown:
+                    publish_state("Center/Down");
                     break;
-                case ACVanes::vanes_4:
-                    publish_state(traits.get_options()[4]);
+                case ACVanes::Down:
+                    publish_state("Down");
+                    break;
+                case ACVanes::SeeIRRemote:
+                    publish_state("See IR Remote");
                     break;
             }
         }
     }
-}
+};
 #endif
 
 class MhiAcCtrl : public climate::Climate,
@@ -192,7 +196,8 @@ public:
         if(frame_errors_sensor_)
             frame_errors_sensor_->loop();
 #ifdef USE_SELECT
-        vanes.loop();
+        if(vanes_ud_select_)
+            vanes_ud_select_->loop();
 #endif
 
         if(mhi_ac_ctrl_core_target_temperature_changed()) {
@@ -296,14 +301,6 @@ public:
     void dump_config() override
     {
     }
-
-#ifdef USE_SELECT
-    std::vector<Select *> get_selects() {
-        return {
-            &vanes,
-        };
-    }
-#endif
 
 protected:
     /// Transmit the state of this climate controller.
@@ -412,11 +409,19 @@ protected:
     SUB_SENSOR(fan_old)
 
 protected:
+#ifdef USE_SELECT
+    MhiVanesUD *vanes_ud_select_;
+#endif
     MhiFrameErrors *frame_errors_sensor_;
     MhiTotalEnergy *total_energy_sensor_;
     MhiPower *power_sensor_;
 
 public:
+#ifdef USE_SELECT
+    void set_vanes_ud_select(MhiVanesUD *select) {
+        this->vanes_ud_select_ = select;
+    }
+#endif
     void set_frame_errors_sensor(MhiFrameErrors *sensor) {
         this->frame_errors_sensor_ = sensor;
     }
@@ -430,7 +435,4 @@ public:
     }
 
 
-#ifdef USE_SELECT
-    MhiVanes vanes;
-#endif
 };

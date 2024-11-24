@@ -31,13 +31,12 @@ climate:
     id: ${device_id}
     name: "${device_name}"
 
-# awaiting https://github.com/esphome/feature-requests/issues/2066
-#select:
-  #- platform: custom
-    #lambda: |-
-      #return ((MhiAcCtrl*)id(${device_id}))->get_selects();
-    #selects:
-      #- name: ${device_name} Vanes
+select:
+  - platform: MhiAcCtrl
+    mhi_ac_ctrl_id: ${mhi_device_id}
+    vanes_ud:
+      name: ${device_name} Vanes Up Down
+      id: ${device_id}_vanes_ud
 
 sensor:
   - platform: MhiAcCtrl

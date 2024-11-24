@@ -65,7 +65,7 @@ enum class ACFan {
 };
 
 enum class ACVanes {  // Vanes enum
-   vanes_1 = 0, vanes_2 = 1, vanes_3 = 2, vanes_4 = 3, swing = 4
+   Up = 0, UpCenter = 1, CenterDown = 2, Down = 3, Swing = 4, SeeIRRemote = 255
 };
 
 //class CallbackInterface_Status {

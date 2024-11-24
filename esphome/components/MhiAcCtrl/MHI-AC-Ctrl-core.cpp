@@ -246,37 +246,45 @@ uint32_t mhi_ac_ctrl_core_frame_errors_get() {
 }
 
 bool mhi_ac_ctrl_core_vanes_updown_changed() {
-    return (mosi_frame_snapshot[DB0] & 0x40) != (mosi_frame_snapshot_prev[DB0] & 0x40) ||
+    return (mosi_frame_snapshot[DB0] & 0xC0) != (mosi_frame_snapshot_prev[DB0] & 0xC0) ||
         (mosi_frame_snapshot[DB1] & 0x30) != (mosi_frame_snapshot_prev[DB1] & 0x30);
 }
 
 ACVanes mhi_ac_ctrl_core_vanes_updown_get() {
-    if(mosi_frame_snapshot[DB0] & 0x40) {
-        return ACVanes::swing;
+    // Swing or up/down position was set using remote
+    // meaning we can't know the position
+    if((mosi_frame_snapshot[DB0] & 0x80) == 0 || (mosi_frame_snapshot[DB1] & 0x80) == 0) {
+        return ACVanes::SeeIRRemote;
     }
-    switch (mosi_frame_snapshot[DB0] & 0x30) {
+
+    if(mosi_frame_snapshot[DB0] & 0x40) {
+        return ACVanes::Swing;
+    }
+    switch (mosi_frame_snapshot[DB1] & 0x30) {
         case 0x00:
-            return ACVanes::vanes_1;
+            return ACVanes::Up;
         case 0x10:
-            return ACVanes::vanes_2;
+            return ACVanes::UpCenter;
         case 0x20:
-            return ACVanes::vanes_3;
+            return ACVanes::CenterDown;
         case 0x30:
         default:
-            return ACVanes::vanes_4;
+            return ACVanes::Down;
     }
 }
 
 void mhi_ac_ctrl_core_vanes_updown_set(ACVanes new_state) {
+    if(new_state == ACVanes::SeeIRRemote)
+        return;
     xSemaphoreTake(miso_semaphore_handle, portMAX_DELAY);
 
-    miso_frame[DB0] |= 0x80; // Swing set
-    if(new_state == ACVanes::swing) {
+    miso_frame[DB0] |= 0x80; // Vanes set
+    if(new_state == ACVanes::Swing) {
         miso_frame[DB0] |= 0x40; // Enable swing
     } else {
         miso_frame[DB0] &= ~0x40; 
         miso_frame[DB1] |= 0x80; // Pos set
-        miso_frame[DB1] |= ((uint8_t) new_state) << 4;
+        miso_frame[DB1] |= (static_cast<uint8_t>(new_state)) << 4;
     }
     xSemaphoreGive(miso_semaphore_handle);
 }
