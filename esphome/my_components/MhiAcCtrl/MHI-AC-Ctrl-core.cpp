@@ -64,11 +64,6 @@ static bool IRAM_ATTR timer_group_isr_callback(void *args)
         spi_slave_transaction_t *t = (spi_slave_transaction_t *) args;
         err = spi_slave_queue_trans(RCV_HOST, t, 0);
     }
-    //if(err) {
-        //gpio_status = 1-gpio_status;
-        //gpio_set_level(GPIO_NUM_3, gpio_status);
-    //}
-    //gpio_status = 1-gpio_status;
     gpio_set_level(GPIO_CS_OUT, 0);
     //timer_set_counter_value(TIMER_GROUP_0, TIMER_0, 0);
     //timer_set_alarm(TIMER_GROUP_0, TIMER_0, TIMER_ALARM_EN);
@@ -390,14 +385,6 @@ static void mhi_poll_task(void *arg)
 
     gpio_set_level(GPIO_CS_OUT, 1);
 
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = (1ULL<<3);
-    io_conf.intr_type =GPIO_INTR_DISABLE;
-    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-    gpio_config(&io_conf);
-
-    gpio_set_level(GPIO_NUM_3, 0);
-
     //Set up a transaction of MHI_FRAME_LEN bytes to send/receive
     spi_slave_trans.length = MHI_FRAME_LEN*8;
     spi_slave_trans.tx_buffer = sendbuf;
@@ -515,9 +502,7 @@ static void mhi_poll_task(void *arg)
             frame_errors++;
 
             // wait a second before retrying communication
-            gpio_set_level(GPIO_NUM_3, 1);
             vTaskDelayMs(1000);
-            gpio_set_level(GPIO_NUM_3, 0);
         } else {
             // Make snapshot if requested
             if(xSemaphoreTake(snapshot_semaphore_handle, 0) != pdTRUE) {
@@ -572,8 +557,6 @@ static void mhi_poll_task(void *arg)
                         mhi_energy.set_current(mosi_frame[DB11]);
                         //float current = ((int)mosi_frame[DB11] * 14) / 51.0f;
                         //ESP_LOGI(TAG, "Current: %f, raw: %i, *230: %f", current, mosi_frame[DB11], current*230);
-                        //gpio_status = 1-gpio_status;
-                        //gpio_set_level(GPIO_NUM_3, gpio_status);
                     }
                     else {
                         ESP_LOGW(TAG, "Current: error: %i", mosi_frame[DB11]);
