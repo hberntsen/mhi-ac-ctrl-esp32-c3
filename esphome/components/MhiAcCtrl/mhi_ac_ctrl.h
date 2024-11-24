@@ -278,9 +278,9 @@ public:
             fan_old_sensor_->publish_state((uint8_t)mhi_ac_ctrl_core_fan_old_get());
         }
 
-        if(mhi_ac_ctrl_core_current_temperature_changed()) {
-            publish_self_state = true;
+        if(mhi_ac_ctrl_core_current_temperature_changed() || std::isnan(this->current_temperature)) {
             this->current_temperature = mhi_ac_ctrl_core_current_temperature_get();
+            publish_self_state |= !std::isnan(this->current_temperature);
         }
 
         if(this->mode != climate::CLIMATE_MODE_HEAT && this->target_temperature < 18) {
