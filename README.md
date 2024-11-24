@@ -5,7 +5,7 @@ This code is based on [@absalom-muc's MHI-AC-Ctrl](https://github.com/absalom-mu
 
 The kicad folder contains a board design for using with the [ESP-C3-32S(4M)-KIT](https://www.aliexpress.com/item/1005003152986418.html). The PCB works great (ordered via https://aisler.net).
 
-Everything is still very much Work in Progress, the features that are there do work reliably at two AC units at @hberntsen's home :).
+The code is running reliably at three AC units at @hberntsen's home :).
 
 Note that you'll need to enable active mode in Home Assistant before sending commands to the AC will work. Without that enabled, the ESP will passively listen to data and you'll be able to use timers again via the IR remote. It is off after boot. You could automate turning on/off the active mode when something is wrong. An automation blueprint to automatically enable it is included in the homeassistent directory.
 
