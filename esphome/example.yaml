@@ -66,22 +66,6 @@ switch:
       name: ${device_name} Active mode
       id: ${device_id}_active_mode
 
-
-# Stop communications to AC when we're offline
-# Stuff like on timer on the IR remote will work when we are in passive mode
-# #TODO: test / increase interval
-#interval:
-  #- interval: 1s
-    #then:
-      #if:
-        #condition:
-          #api.connected:
-        #then:
-          #- switch.turn_on: ${device_id}_active_mode
-        #else:
-          #- switch.turn_off: ${device_id}_active_mode
-
-
 status_led:
   pin: 
     #white led, off when all good

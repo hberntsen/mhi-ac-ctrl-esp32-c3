@@ -1,0 +1,23 @@
+blueprint:
+  name: MHI active mode
+  description: Turns on active mode when Home Assistant has connected to the MHI AC
+  domain: automation
+  input:
+    active_mode_switch:
+      name: Active mode switch
+      description: The active mode switch to monitor
+      selector:
+        entity:
+          filter:
+            - domain: switch
+
+triggers:
+  - trigger: state
+    entity_id: !input active_mode_switch
+    from: unavailable
+
+
+actions:
+  - action: switch.turn_on
+    target: 
+      entity_id: !input active_mode_switch
