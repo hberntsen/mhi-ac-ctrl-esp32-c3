@@ -1,0 +1,23 @@
+name: Build example
+
+on:
+  push:
+  workflow_dispatch:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-build-example
+  cancel-in-progress: true
+
+jobs:
+  build-example:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: esphome/esphome:2024.11
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Compile example
+        working-directory: esphome
+        run: esphome compile example.yaml
