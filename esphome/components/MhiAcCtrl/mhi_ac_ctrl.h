@@ -397,7 +397,7 @@ protected:
         return traits;
     }
 
-    const float minimum_temperature_ { 10.0f };
+    const float minimum_temperature_ { 18.0f };
     const float maximum_temperature_ { 30.0f };
     // Although the hardware accepts temperatures in steps of 0.5, it
     // effectively is per 1 degree:
