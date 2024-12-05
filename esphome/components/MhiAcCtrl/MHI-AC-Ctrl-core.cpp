@@ -8,6 +8,7 @@
 #include <math.h>
 #include <string.h>
 
+#include "esphome/core/gpio.h"
 #include "driver/timer.h"
 #include "driver/spi_slave.h"
 #include "driver/gpio.h"
@@ -43,6 +44,12 @@ static uint8_t mosi_frame_snapshot[DB14];
 static uint8_t mosi_frame_snapshot_prev[DB14];
 static uint32_t frame_errors = 0;
 
+extern int gpio_mosi_pin;
+extern int gpio_miso_pin;
+extern int gpio_sclk_pin;
+extern int gpio_cs_in_pin;
+extern int gpio_cs_out_pin;
+
 namespace mhi_ac {
 MHIEnergy mhi_energy(230);
 
@@ -58,12 +65,14 @@ static bool IRAM_ATTR timer_group_isr_callback(void *args)
     esp_err_t err;
     BaseType_t xHigherPriorityTaskWoken;
     // Trigger Chip Select
-    gpio_set_level(GPIO_CS_OUT, 1);
+     gpio_set_level((gpio_num_t)gpio_cs_out_pin, 1);
+    // gpio_set_level(GPIO_CS_OUT, 1);
     if(ready) {
         spi_slave_transaction_t *t = (spi_slave_transaction_t *) args;
         err = spi_slave_queue_trans(RCV_HOST, t, 0);
     }
-    gpio_set_level(GPIO_CS_OUT, 0);
+    gpio_set_level((gpio_num_t)gpio_cs_out_pin, 0);
+    // gpio_set_level(GPIO_CS_OUT, 0);
     return false;
 }
 
@@ -322,9 +331,12 @@ static void mhi_poll_task(void *arg)
 
     // configuration for the SPI bus
     spi_bus_config_t buscfg={
-        .mosi_io_num = GPIO_MOSI,
-        .miso_io_num = GPIO_MISO,
-        .sclk_io_num = GPIO_SCLK,
+        .mosi_io_num = (gpio_num_t)gpio_mosi_pin,
+        .miso_io_num = (gpio_num_t)gpio_miso_pin,
+        .sclk_io_num = (gpio_num_t)gpio_sclk_pin,
+        // .mosi_io_num = GPIO_MOSI,
+        // .miso_io_num = GPIO_MISO,
+        // .sclk_io_num = GPIO_SCLK,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
         .flags = SPICOMMON_BUSFLAG_GPIO_PINS | SPICOMMON_BUSFLAG_SLAVE,
@@ -332,7 +344,8 @@ static void mhi_poll_task(void *arg)
 
     // configuration for the SPI slave interface
     spi_slave_interface_config_t slvcfg={
-        .spics_io_num = GPIO_CS_IN,
+        .spics_io_num = (gpio_num_t)gpio_cs_in_pin,
+        // .spics_io_num = GPIO_CS_IN,
         .flags = SPI_SLAVE_BIT_LSBFIRST,
         .queue_size = 1,
         .mode = 3,                    //CPOL=1, CPHA=1
@@ -366,7 +379,8 @@ static void mhi_poll_task(void *arg)
 
     gpio_config_t io_conf = {};
     io_conf.mode = GPIO_MODE_INPUT;
-    io_conf.pin_bit_mask = (1ULL<<GPIO_SCLK);
+    io_conf.pin_bit_mask = (1ULL<<gpio_sclk_pin);
+    // io_conf.pin_bit_mask = (1ULL<<GPIO_SCLK);
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     io_conf.pull_up_en = GPIO_PULLUP_ENABLE;                                     // required to prevent abort() caused by floating pin when daughtboard not connected
     io_conf.intr_type = GPIO_INTR_LOW_LEVEL;                    // when this is set to NEGEDGE, DMA sometimes doesn't read the last 4 bytes
@@ -377,17 +391,22 @@ static void mhi_poll_task(void *arg)
 
 
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
-    gpio_isr_handler_add(GPIO_SCLK, gpio_isr_handler, NULL);
-    //gpio_intr_disable(GPIO_SCLK);
-    gpio_intr_enable(GPIO_SCLK);
+    gpio_isr_handler_add((gpio_num_t)gpio_sclk_pin, gpio_isr_handler, NULL);
+    //gpio_intr_disable((gpio_num_t)gpio_sclk_pin);
+    gpio_intr_enable((gpio_num_t)gpio_sclk_pin);
+    // gpio_isr_handler_add(GPIO_SCLK, gpio_isr_handler, NULL);
+    // //gpio_intr_disable(GPIO_SCLK);
+    // gpio_intr_enable(GPIO_SCLK);
 
     io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = (1ULL<<GPIO_CS_OUT);
+    io_conf.pin_bit_mask = (1ULL<<(gpio_num_t)gpio_cs_out_pin);
+    // io_conf.pin_bit_mask = (1ULL<<GPIO_CS_OUT);
     io_conf.intr_type =GPIO_INTR_DISABLE;
     io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
     gpio_config(&io_conf);
 
-    gpio_set_level(GPIO_CS_OUT, 1);
+    gpio_set_level((gpio_num_t)gpio_cs_out_pin, 1);
+    // gpio_set_level(GPIO_CS_OUT, 1);
 
     //Set up a transaction of MHI_FRAME_LEN bytes to send/receive
     spi_slave_trans.length = MHI_FRAME_LEN*8;

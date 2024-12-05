@@ -1,5 +1,6 @@
 #include "MHI-AC-Ctrl-core.h"
 
+#include "esphome/core/gpio.h"
 #include "esphome/components/climate/climate.h"
 #include "esphome/components/sensor/sensor.h"
 #ifdef USE_SWITCH
@@ -19,6 +20,11 @@ using namespace esphome::switch_;
 using namespace mhi_ac;
 
 static const char* TAG = "mhi_ac_ctrl";
+int gpio_mosi_pin;
+int gpio_miso_pin;
+int gpio_sclk_pin;
+int gpio_cs_in_pin;
+int gpio_cs_out_pin;
 
 class MhiFrameErrors : public Sensor {
 public:
@@ -159,6 +165,11 @@ public:
 class MhiAcCtrl : public climate::Climate,
                   public Component {
 public:
+    void set_mosi_pin(InternalGPIOPin *pin) { gpio_mosi_pin = pin->get_pin(); }
+    void set_miso_pin(InternalGPIOPin *pin) { gpio_miso_pin = pin->get_pin(); }
+    void set_sclk_pin(InternalGPIOPin *pin) { gpio_sclk_pin = pin->get_pin(); }
+    void set_cs_in_pin(InternalGPIOPin *pin) { gpio_cs_in_pin = pin->get_pin(); }
+    void set_cs_out_pin(InternalGPIOPin *pin) { gpio_cs_out_pin = pin->get_pin(); }
     void setup() override
     {
         auto restore = this->restore_state_();

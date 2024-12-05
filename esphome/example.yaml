@@ -30,6 +30,12 @@ climate:
     mhi_ac_ctrl_id: ${mhi_device_id}
     id: ${device_id}
     name: "${device_name}"
+    ## Optional PIN config. Default values:
+    #mosi_pin: GPIO7
+    #miso_pin: GPIO2 
+    #sclk_pin: GPIO6
+    #cs_in_pin: GPIO10
+    #cs_out_pin: GPIO9
 
 select:
   - platform: MhiAcCtrl
