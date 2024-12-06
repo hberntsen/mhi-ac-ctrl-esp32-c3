@@ -298,20 +298,9 @@ static void mhi_poll_task(void *arg)
     uint8_t frame = 0;
     bool halfcycle = false;
 
-
     uint16_t rx_checksum = 0;
     uint16_t tx_checksum = 0;
     bool frame_diff = false;
-    bool have_miso_semaphore = false;
-
-    const char *mode ;                         // can be removed when diagnostic lines are removed
-    const char *state;                        // can be removed when diagnostic lines are removed
-    uint8_t mhi_fan_speed;
-
-    uint8_t active;                     // off, on
-    uint8_t target_state;               // auto, heat, cool
-    uint8_t current_state;              // inactive, idle, heating, cooling; look at compressor status in DB13
-    float current_temp, set_temp;
 
     // use WORD_ALIGNED_ATTR when using DMA buffer
     WORD_ALIGNED_ATTR uint8_t recvbuf[MHI_FRAME_LEN];
@@ -490,84 +479,6 @@ static void mhi_poll_task(void *arg)
                     }
                 }
             }
-            switch (mosi_frame[DB0] & MODE_MASK)
-            {
-                case MODE_AUTO:
-                    target_state = 0;
-                    mode = "auto";
-                    break;
-                case MODE_HEAT:
-                    target_state = 1;
-                    mode = "heat";
-                    break;
-                case MODE_COOL:
-                    target_state = 2;
-                    mode = "cool";
-                    break;
-
-                case MODE_DRY:
-                    target_state = 0;
-                    mode = "dry";
-                    break;
-                case MODE_FAN:
-                    target_state = 0;
-                    mode = "fan";
-                    break;
-                default:
-                    target_state = 0;
-                    mode = "unknown";
-                    break;
-            }
-
-            // this is the power state and the compressor state
-            if (!(mosi_frame[DB0] & PWR_MASK)) {
-                active = 0;
-                current_state = 0;
-                state = "inactive";
-            } else if (!(mosi_frame[DB13] & COMP_ACTIVE_MASK)) {
-                active = 1;
-                current_state = 1;
-                state = "idle";
-            } else if (mosi_frame[DB13] & HEAT_COOL_MASK) {
-                active = 1;
-                current_state = 2;
-                state = "heating";
-            } else {
-                active = 1;
-                current_state = 3;
-                state = "cooling";
-            }
-
-            current_temp = ((int)mosi_frame[DB3] - 61) / 4.0;
-
-            // this needs to behave differently based on mode
-            // save heating and cooling threshold separately
-            // if auto, set cool and heat threshold around mid-point (determined by TEMP_THRESHOLD_DIFF)
-            set_temp = (int)(mosi_frame[DB2] & 0x7F) / 2.0;
-
-            mhi_fan_speed = mosi_frame[DB1] & FAN_MASK;
-
-            // ********************** Diagnostics ************************
-
-            ESP_LOGD(TAG, "packet: %5d    %02x %02x %02x   %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x   %02x %02x (calc %d)  rx_checksum: %d",
-                    packet_cnt,
-                mosi_frame[0],  mosi_frame[1],  mosi_frame[2],  mosi_frame[3],  mosi_frame[4],  mosi_frame[5],  mosi_frame[6],  mosi_frame[7],  mosi_frame[8],  mosi_frame[9],
-                mosi_frame[10], mosi_frame[11], mosi_frame[12], mosi_frame[13], mosi_frame[14], mosi_frame[15], mosi_frame[16], mosi_frame[17], mosi_frame[18], mosi_frame[19],
-                    (mosi_frame[18]<<8)+(mosi_frame[19]),
-                    rx_checksum
-                );
-
-            ESP_LOGD(TAG, "            power: %3s  mode: %5s  temp: %2.2f  set_temp: %2.2f  mhi_fan_speed: %d  state: %8s",
-                (mosi_frame[DB0] & PWR_MASK) ? "on" : "off",
-                mode,
-                current_temp,
-                set_temp,
-                mhi_fan_speed,
-                state
-            );
-
-            // ***********************************************************
-
         }
     }
 }
