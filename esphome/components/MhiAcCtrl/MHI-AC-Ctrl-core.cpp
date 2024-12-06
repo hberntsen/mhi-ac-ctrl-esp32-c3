@@ -586,7 +586,13 @@ void mhi_ac_ctrl_core_init(const Config& config) {
         .sclk_io_num = config.sclk,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
+        .data4_io_num = -1,
+        .data5_io_num = -1,
+        .data6_io_num = -1,
+        .data7_io_num = -1,
+        .max_transfer_sz = 0,
         .flags = SPICOMMON_BUSFLAG_GPIO_PINS | SPICOMMON_BUSFLAG_SLAVE,
+        .intr_flags = 0,
     };
 
     // configuration for the SPI slave interface
@@ -595,6 +601,8 @@ void mhi_ac_ctrl_core_init(const Config& config) {
         .flags = SPI_SLAVE_BIT_LSBFIRST,
         .queue_size = 1,
         .mode = 3,                    //CPOL=1, CPHA=1
+        .post_setup_cb = 0,
+        .post_trans_cb = 0,
     };
 
     // initialize SPI slave interface
@@ -605,10 +613,12 @@ void mhi_ac_ctrl_core_init(const Config& config) {
     timer_config_t timer_config = {
         .alarm_en = TIMER_ALARM_DIS,
         .counter_en = TIMER_PAUSE,
+        .intr_type = TIMER_INTR_LEVEL,
         .counter_dir = TIMER_COUNT_UP,
         .auto_reload = TIMER_AUTORELOAD_DIS,
         .divider = TIMER_DIVIDER,
-    }; // default clock source is APB
+        .clk_src = TIMER_SRC_CLK_APB
+    };
     timer_init(TIMER_GROUP_0, TIMER_0, &timer_config);
 
     // Configure the alarm value (in milliseconds) and the interrupt on alarm. there is a delay between each frame of 40ms.
