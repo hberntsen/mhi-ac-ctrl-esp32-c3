@@ -2,15 +2,9 @@
 #include <stdint.h>
 #include <atomic>
 #include "esp_timer.h"
+#include "driver/gpio.h"
 
 // # Config
-// ## pin defintions
-#define GPIO_MOSI                   7
-#define GPIO_MISO                   2
-#define GPIO_SCLK                   GPIO_NUM_6
-#define GPIO_CS_OUT                 GPIO_NUM_9
-#define GPIO_CS_IN                  10
-
 #define RCV_HOST                    SPI2_HOST
 
 #define MHI_FRAME_LEN               20
@@ -40,6 +34,14 @@
 #define MHI_NUM_FRAMES_PER_INTERVAL 20              // every 20 frames, MISO_frame[DB14] bit2 toggles
 
 namespace mhi_ac {
+
+struct Config {
+  gpio_num_t mosi;
+  gpio_num_t miso;
+  gpio_num_t sclk;
+  gpio_num_t cs_in;
+  gpio_num_t cs_out;
+};
 
 enum class ACPower {
    power_off = 0,
@@ -72,7 +74,7 @@ enum class ACVanes {  // Vanes enum
    //public: virtual void cbiStatusFunction(ACStatus status, int value) = 0;
 //};
 
-void mhi_ac_ctrl_core_init();
+void mhi_ac_ctrl_core_init(const Config& config);
 bool mhi_ac_ctrl_core_snapshot(uint32_t wait_time_ms);
 
 void mhi_ac_ctrl_core_active_mode_set(bool state);

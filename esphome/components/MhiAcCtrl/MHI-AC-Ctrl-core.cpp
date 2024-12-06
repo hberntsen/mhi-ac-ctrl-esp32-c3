@@ -34,7 +34,7 @@ static StaticSemaphore_t miso_semaphore_buffer;
 
 static int ready = 0;
 static bool active_mode = false;
-
+static gpio_num_t gpio_cs_out;
 
 static SemaphoreHandle_t snapshot_semaphore_handle;
 static StaticSemaphore_t snapshot_semaphore_buffer;
@@ -57,12 +57,12 @@ static bool IRAM_ATTR timer_group_isr_callback(void *args)
     esp_err_t err;
     BaseType_t xHigherPriorityTaskWoken;
     // Trigger Chip Select
-    gpio_set_level(GPIO_CS_OUT, 1);
+    gpio_set_level(gpio_cs_out, 1);
     if(ready) {
         spi_slave_transaction_t *t = (spi_slave_transaction_t *) args;
         err = spi_slave_queue_trans(RCV_HOST, t, 0);
     }
-    gpio_set_level(GPIO_CS_OUT, 0);
+    gpio_set_level(gpio_cs_out, 0);
     return false;
 }
 
@@ -572,17 +572,18 @@ static void mhi_poll_task(void *arg)
     }
 }
 
-void mhi_ac_ctrl_core_init() {
+void mhi_ac_ctrl_core_init(const Config& config) {
     esp_err_t err;
 
     miso_semaphore_handle = xSemaphoreCreateMutexStatic( &miso_semaphore_buffer );
     snapshot_semaphore_handle = xSemaphoreCreateBinaryStatic( &snapshot_semaphore_buffer );
+    gpio_cs_out = config.cs_out;
 
     // configuration for the SPI bus
     spi_bus_config_t buscfg = {
-        .mosi_io_num = GPIO_MOSI,
-        .miso_io_num = GPIO_MISO,
-        .sclk_io_num = GPIO_SCLK,
+        .mosi_io_num = config.mosi,
+        .miso_io_num = config.miso,
+        .sclk_io_num = config.sclk,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
         .flags = SPICOMMON_BUSFLAG_GPIO_PINS | SPICOMMON_BUSFLAG_SLAVE,
@@ -590,7 +591,7 @@ void mhi_ac_ctrl_core_init() {
 
     // configuration for the SPI slave interface
     spi_slave_interface_config_t slvcfg = {
-        .spics_io_num = GPIO_CS_IN,
+        .spics_io_num = config.cs_in,
         .flags = SPI_SLAVE_BIT_LSBFIRST,
         .queue_size = 1,
         .mode = 3,                    //CPOL=1, CPHA=1
@@ -601,14 +602,14 @@ void mhi_ac_ctrl_core_init() {
     ESP_ERROR_CHECK(err);
 
     // Select and initialize basic parameters of the timer
-    timer_config_t config = {
+    timer_config_t timer_config = {
         .alarm_en = TIMER_ALARM_DIS,
         .counter_en = TIMER_PAUSE,
         .counter_dir = TIMER_COUNT_UP,
         .auto_reload = TIMER_AUTORELOAD_DIS,
         .divider = TIMER_DIVIDER,
     }; // default clock source is APB
-    timer_init(TIMER_GROUP_0, TIMER_0, &config);
+    timer_init(TIMER_GROUP_0, TIMER_0, &timer_config);
 
     // Configure the alarm value (in milliseconds) and the interrupt on alarm. there is a delay between each frame of 40ms.
     //  so we set the alarm to 20ms. once the alarm triggers, spi_slave_queue_trans is called which will get the data from the next spi packet. This is also the point to toggle the CS line to mark the end/start of a SPI transaction.
@@ -617,7 +618,7 @@ void mhi_ac_ctrl_core_init() {
 
     gpio_config_t io_conf = {};
     io_conf.mode = GPIO_MODE_INPUT;
-    io_conf.pin_bit_mask = (1ULL<<GPIO_SCLK);
+    io_conf.pin_bit_mask = (1ULL<<config.sclk);
 io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     io_conf.pull_up_en = GPIO_PULLUP_ENABLE;                                     // required to prevent abort() caused by floating pin when daughtboard not connected
     io_conf.intr_type = GPIO_INTR_LOW_LEVEL;                    // when this is set to NEGEDGE, DMA sometimes doesn't read the last 4 bytes
@@ -626,16 +627,16 @@ io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     gpio_config(&io_conf);
 
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
-    gpio_isr_handler_add(GPIO_SCLK, gpio_isr_handler, NULL);
-    gpio_intr_enable(GPIO_SCLK);
+    gpio_isr_handler_add(config.sclk, gpio_isr_handler, NULL);
+    gpio_intr_enable(config.sclk);
 
     io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = (1ULL<<GPIO_CS_OUT);
+    io_conf.pin_bit_mask = (1ULL<<gpio_cs_out);
     io_conf.intr_type =GPIO_INTR_DISABLE;
     io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
     gpio_config(&io_conf);
 
-    gpio_set_level(GPIO_CS_OUT, 1);
+    gpio_set_level(gpio_cs_out, 1);
 
     xTaskCreatePinnedToCore(
                         mhi_poll_task,          // Function to implement the task
