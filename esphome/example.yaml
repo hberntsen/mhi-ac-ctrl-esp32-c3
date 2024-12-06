@@ -15,7 +15,7 @@ external_components:
 
 esp32:
   board: esp32-c3-devkitm-1
-  framework: 
+  framework:
     type: esp-idf
 
 # Enable logging
@@ -24,18 +24,19 @@ logger:
 
 MhiAcCtrl:
   id: ${mhi_device_id}
+  # Optional PIN config
+  # The default values are:
+  mosi_pin: GPIO7
+  miso_pin: GPIO2
+  sclk_pin: GPIO6
+  cs_in_pin: GPIO10
+  cs_out_pin: GPIO9
 
 climate:
   - platform: MhiAcCtrl
     mhi_ac_ctrl_id: ${mhi_device_id}
     id: ${device_id}
     name: "${device_name}"
-    ## Optional PIN config. Default values:
-    #mosi_pin: GPIO7
-    #miso_pin: GPIO2 
-    #sclk_pin: GPIO6
-    #cs_in_pin: GPIO10
-    #cs_out_pin: GPIO9
 
 select:
   - platform: MhiAcCtrl
@@ -73,7 +74,7 @@ switch:
       id: ${device_id}_active_mode
 
 status_led:
-  pin: 
+  pin:
     #white led, off when all good
     number: 19
 

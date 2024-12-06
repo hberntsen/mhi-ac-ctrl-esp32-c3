@@ -8,7 +8,6 @@
 #include <math.h>
 #include <string.h>
 
-#include "esphome/core/gpio.h"
 #include "driver/timer.h"
 #include "driver/spi_slave.h"
 #include "driver/gpio.h"
@@ -33,22 +32,15 @@ static uint8_t miso_frame[] = { 0xA9, 0x00, 0x07, 0x00, 0x00, 0x00, 0xff, 0x00, 
 static SemaphoreHandle_t miso_semaphore_handle;
 static StaticSemaphore_t miso_semaphore_buffer;
 
-static int gpio_status = 0;
 static int ready = 0;
 static bool active_mode = false;
-
+static gpio_num_t gpio_cs_out;
 
 static SemaphoreHandle_t snapshot_semaphore_handle;
 static StaticSemaphore_t snapshot_semaphore_buffer;
 static uint8_t mosi_frame_snapshot[DB14];
 static uint8_t mosi_frame_snapshot_prev[DB14];
 static uint32_t frame_errors = 0;
-
-extern int gpio_mosi_pin;
-extern int gpio_miso_pin;
-extern int gpio_sclk_pin;
-extern int gpio_cs_in_pin;
-extern int gpio_cs_out_pin;
 
 namespace mhi_ac {
 MHIEnergy mhi_energy(230);
@@ -65,14 +57,12 @@ static bool IRAM_ATTR timer_group_isr_callback(void *args)
     esp_err_t err;
     BaseType_t xHigherPriorityTaskWoken;
     // Trigger Chip Select
-     gpio_set_level((gpio_num_t)gpio_cs_out_pin, 1);
-    // gpio_set_level(GPIO_CS_OUT, 1);
+    gpio_set_level(gpio_cs_out, 1);
     if(ready) {
         spi_slave_transaction_t *t = (spi_slave_transaction_t *) args;
         err = spi_slave_queue_trans(RCV_HOST, t, 0);
     }
-    gpio_set_level((gpio_num_t)gpio_cs_out_pin, 0);
-    // gpio_set_level(GPIO_CS_OUT, 0);
+    gpio_set_level(gpio_cs_out, 0);
     return false;
 }
 
@@ -291,7 +281,7 @@ void mhi_ac_ctrl_core_vanes_updown_set(ACVanes new_state) {
     if(new_state == ACVanes::Swing) {
         miso_frame[DB0] |= 0x40; // Enable swing
     } else {
-        miso_frame[DB0] &= ~0x40; 
+        miso_frame[DB0] &= ~0x40;
         miso_frame[DB1] |= 0x80; // Pos set
         miso_frame[DB1] |= (static_cast<uint8_t>(new_state)) << 4;
     }
@@ -308,20 +298,9 @@ static void mhi_poll_task(void *arg)
     uint8_t frame = 0;
     bool halfcycle = false;
 
-
     uint16_t rx_checksum = 0;
     uint16_t tx_checksum = 0;
     bool frame_diff = false;
-    bool have_miso_semaphore = false;
-
-    const char *mode ;                         // can be removed when diagnostic lines are removed
-    const char *state;                        // can be removed when diagnostic lines are removed
-    uint8_t mhi_fan_speed;
-
-    uint8_t active;                     // off, on
-    uint8_t target_state;               // auto, heat, cool
-    uint8_t current_state;              // inactive, idle, heating, cooling; look at compressor status in DB13
-    float current_temp, set_temp;
 
     // use WORD_ALIGNED_ATTR when using DMA buffer
     WORD_ALIGNED_ATTR uint8_t recvbuf[MHI_FRAME_LEN];
@@ -329,84 +308,11 @@ static void mhi_poll_task(void *arg)
 
     uint8_t mosi_frame[MHI_FRAME_LEN];
 
-    // configuration for the SPI bus
-    spi_bus_config_t buscfg={
-        .mosi_io_num = (gpio_num_t)gpio_mosi_pin,
-        .miso_io_num = (gpio_num_t)gpio_miso_pin,
-        .sclk_io_num = (gpio_num_t)gpio_sclk_pin,
-        // .mosi_io_num = GPIO_MOSI,
-        // .miso_io_num = GPIO_MISO,
-        // .sclk_io_num = GPIO_SCLK,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1,
-        .flags = SPICOMMON_BUSFLAG_GPIO_PINS | SPICOMMON_BUSFLAG_SLAVE,
-    };
-
-    // configuration for the SPI slave interface
-    spi_slave_interface_config_t slvcfg={
-        .spics_io_num = (gpio_num_t)gpio_cs_in_pin,
-        // .spics_io_num = GPIO_CS_IN,
-        .flags = SPI_SLAVE_BIT_LSBFIRST,
-        .queue_size = 1,
-        .mode = 3,                    //CPOL=1, CPHA=1
-    };
-
     spi_slave_transaction_t spi_slave_trans;
     spi_slave_transaction_t* spi_slave_trans_out;       // needed for spi_slave_get_trans_result which needs a pointer to a pointer
 
-    // initialize SPI slave interface
-    err = spi_slave_initialize(RCV_HOST, &buscfg, &slvcfg, SPI_DMA_CH_AUTO);    // can't disable DMA. no comms if you do...
-
-    ESP_ERROR_CHECK(err);
-
-
-    // Select and initialize basic parameters of the timer
-    timer_config_t config = {
-        .alarm_en = TIMER_ALARM_DIS,
-        .counter_en = TIMER_PAUSE,
-        .counter_dir = TIMER_COUNT_UP,
-        .auto_reload = TIMER_AUTORELOAD_DIS,
-        .divider = TIMER_DIVIDER,
-    }; // default clock source is APB
-    timer_init(TIMER_GROUP_0, TIMER_0, &config);
-
-    // Configure the alarm value (in milliseconds) and the interrupt on alarm. there is a delay between each frame of 40ms.
-    //  so we set the alarm to 20ms. once the alarm triggers, spi_slave_queue_trans is called which will get the data from the next spi packet. This is also the point to toggle the CS line to mark the end/start of a SPI transaction.
-    timer_set_alarm_value(TIMER_GROUP_0, TIMER_0, 20 * TIMER_SCALE_MS);
-    timer_enable_intr(TIMER_GROUP_0, TIMER_0);
     timer_isr_callback_add(TIMER_GROUP_0, TIMER_0, timer_group_isr_callback, &spi_slave_trans, 0);
     timer_start(TIMER_GROUP_0, TIMER_0);
-
-    gpio_config_t io_conf = {};
-    io_conf.mode = GPIO_MODE_INPUT;
-    io_conf.pin_bit_mask = (1ULL<<gpio_sclk_pin);
-    // io_conf.pin_bit_mask = (1ULL<<GPIO_SCLK);
-    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    io_conf.pull_up_en = GPIO_PULLUP_ENABLE;                                     // required to prevent abort() caused by floating pin when daughtboard not connected
-    io_conf.intr_type = GPIO_INTR_LOW_LEVEL;                    // when this is set to NEGEDGE, DMA sometimes doesn't read the last 4 bytes
-                                                                // if not connected to AC (plugged in) when starting, it will crash - probably because it
-                                                                // immediately calls an interrupt
-    gpio_config(&io_conf);
-
-
-
-    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
-    gpio_isr_handler_add((gpio_num_t)gpio_sclk_pin, gpio_isr_handler, NULL);
-    //gpio_intr_disable((gpio_num_t)gpio_sclk_pin);
-    gpio_intr_enable((gpio_num_t)gpio_sclk_pin);
-    // gpio_isr_handler_add(GPIO_SCLK, gpio_isr_handler, NULL);
-    // //gpio_intr_disable(GPIO_SCLK);
-    // gpio_intr_enable(GPIO_SCLK);
-
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = (1ULL<<(gpio_num_t)gpio_cs_out_pin);
-    // io_conf.pin_bit_mask = (1ULL<<GPIO_CS_OUT);
-    io_conf.intr_type =GPIO_INTR_DISABLE;
-    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-    gpio_config(&io_conf);
-
-    gpio_set_level((gpio_num_t)gpio_cs_out_pin, 1);
-    // gpio_set_level(GPIO_CS_OUT, 1);
 
     //Set up a transaction of MHI_FRAME_LEN bytes to send/receive
     spi_slave_trans.length = MHI_FRAME_LEN*8;
@@ -573,91 +479,85 @@ static void mhi_poll_task(void *arg)
                     }
                 }
             }
-            switch (mosi_frame[DB0] & MODE_MASK)
-            {
-                case MODE_AUTO:
-                    target_state = 0;
-                    mode = "auto";
-                    break;
-                case MODE_HEAT:
-                    target_state = 1;
-                    mode = "heat";
-                    break;
-                case MODE_COOL:
-                    target_state = 2;
-                    mode = "cool";
-                    break;
-
-                case MODE_DRY:
-                    target_state = 0;
-                    mode = "dry";
-                    break;
-                case MODE_FAN:
-                    target_state = 0;
-                    mode = "fan";
-                    break;
-                default:
-                    target_state = 0;
-                    mode = "unknown";
-                    break;
-            }
-
-            // this is the power state and the compressor state
-            if (!(mosi_frame[DB0] & PWR_MASK)) {
-                active = 0;
-                current_state = 0;
-                state = "inactive";
-            } else if (!(mosi_frame[DB13] & COMP_ACTIVE_MASK)) {
-                active = 1;
-                current_state = 1;
-                state = "idle";
-            } else if (mosi_frame[DB13] & HEAT_COOL_MASK) {
-                active = 1;
-                current_state = 2;
-                state = "heating";
-            } else {
-                active = 1;
-                current_state = 3;
-                state = "cooling";
-            }
-
-            current_temp = ((int)mosi_frame[DB3] - 61) / 4.0;
-
-            // this needs to behave differently based on mode
-            // save heating and cooling threshold separately
-            // if auto, set cool and heat threshold around mid-point (determined by TEMP_THRESHOLD_DIFF)
-            set_temp = (int)(mosi_frame[DB2] & 0x7F) / 2.0;
-
-            mhi_fan_speed = mosi_frame[DB1] & FAN_MASK;
-
-            // ********************** Diagnostics ************************
-
-            ESP_LOGD(TAG, "packet: %5d    %02x %02x %02x   %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x   %02x %02x (calc %d)  rx_checksum: %d",
-                    packet_cnt,
-                mosi_frame[0],  mosi_frame[1],  mosi_frame[2],  mosi_frame[3],  mosi_frame[4],  mosi_frame[5],  mosi_frame[6],  mosi_frame[7],  mosi_frame[8],  mosi_frame[9],
-                mosi_frame[10], mosi_frame[11], mosi_frame[12], mosi_frame[13], mosi_frame[14], mosi_frame[15], mosi_frame[16], mosi_frame[17], mosi_frame[18], mosi_frame[19],
-                    (mosi_frame[18]<<8)+(mosi_frame[19]),
-                    rx_checksum
-                );
-
-            ESP_LOGD(TAG, "            power: %3s  mode: %5s  temp: %2.2f  set_temp: %2.2f  mhi_fan_speed: %d  state: %8s",
-                (mosi_frame[DB0] & PWR_MASK) ? "on" : "off",
-                mode,
-                current_temp,
-                set_temp,
-                mhi_fan_speed,
-                state
-            );
-
-            // ***********************************************************
-
         }
     }
 }
 
-void mhi_ac_ctrl_core_init() {
+void mhi_ac_ctrl_core_init(const Config& config) {
+    esp_err_t err;
+
     miso_semaphore_handle = xSemaphoreCreateMutexStatic( &miso_semaphore_buffer );
     snapshot_semaphore_handle = xSemaphoreCreateBinaryStatic( &snapshot_semaphore_buffer );
+    gpio_cs_out = config.cs_out;
+
+    // configuration for the SPI bus
+    spi_bus_config_t buscfg = {
+        .mosi_io_num = config.mosi,
+        .miso_io_num = config.miso,
+        .sclk_io_num = config.sclk,
+        .quadwp_io_num = -1,
+        .quadhd_io_num = -1,
+        .data4_io_num = -1,
+        .data5_io_num = -1,
+        .data6_io_num = -1,
+        .data7_io_num = -1,
+        .max_transfer_sz = 0,
+        .flags = SPICOMMON_BUSFLAG_GPIO_PINS | SPICOMMON_BUSFLAG_SLAVE,
+        .intr_flags = 0,
+    };
+
+    // configuration for the SPI slave interface
+    spi_slave_interface_config_t slvcfg = {
+        .spics_io_num = config.cs_in,
+        .flags = SPI_SLAVE_BIT_LSBFIRST,
+        .queue_size = 1,
+        .mode = 3,                    //CPOL=1, CPHA=1
+        .post_setup_cb = 0,
+        .post_trans_cb = 0,
+    };
+
+    // initialize SPI slave interface
+    err = spi_slave_initialize(RCV_HOST, &buscfg, &slvcfg, SPI_DMA_CH_AUTO);    // can't disable DMA. no comms if you do...
+    ESP_ERROR_CHECK(err);
+
+    // Select and initialize basic parameters of the timer
+    timer_config_t timer_config = {
+        .alarm_en = TIMER_ALARM_DIS,
+        .counter_en = TIMER_PAUSE,
+        .intr_type = TIMER_INTR_LEVEL,
+        .counter_dir = TIMER_COUNT_UP,
+        .auto_reload = TIMER_AUTORELOAD_DIS,
+        .divider = TIMER_DIVIDER,
+        .clk_src = TIMER_SRC_CLK_APB
+    };
+    timer_init(TIMER_GROUP_0, TIMER_0, &timer_config);
+
+    // Configure the alarm value (in milliseconds) and the interrupt on alarm. there is a delay between each frame of 40ms.
+    //  so we set the alarm to 20ms. once the alarm triggers, spi_slave_queue_trans is called which will get the data from the next spi packet. This is also the point to toggle the CS line to mark the end/start of a SPI transaction.
+    timer_set_alarm_value(TIMER_GROUP_0, TIMER_0, 20 * TIMER_SCALE_MS);
+    timer_enable_intr(TIMER_GROUP_0, TIMER_0);
+
+    gpio_config_t io_conf = {};
+    io_conf.mode = GPIO_MODE_INPUT;
+    io_conf.pin_bit_mask = (1ULL<<config.sclk);
+io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_ENABLE;                                     // required to prevent abort() caused by floating pin when daughtboard not connected
+    io_conf.intr_type = GPIO_INTR_LOW_LEVEL;                    // when this is set to NEGEDGE, DMA sometimes doesn't read the last 4 bytes
+                                                                // if not connected to AC (plugged in) when starting, it will crash - probably because it
+                                                                // immediately calls an interrupt
+    gpio_config(&io_conf);
+
+    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
+    gpio_isr_handler_add(config.sclk, gpio_isr_handler, NULL);
+    gpio_intr_enable(config.sclk);
+
+    io_conf.mode = GPIO_MODE_OUTPUT;
+    io_conf.pin_bit_mask = (1ULL<<gpio_cs_out);
+    io_conf.intr_type =GPIO_INTR_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    gpio_config(&io_conf);
+
+    gpio_set_level(gpio_cs_out, 1);
 
     xTaskCreatePinnedToCore(
                         mhi_poll_task,          // Function to implement the task

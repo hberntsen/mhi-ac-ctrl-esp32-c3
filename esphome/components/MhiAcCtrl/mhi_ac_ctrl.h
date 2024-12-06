@@ -1,6 +1,6 @@
 #include "MHI-AC-Ctrl-core.h"
-
 #include "esphome/core/gpio.h"
+
 #include "esphome/components/climate/climate.h"
 #include "esphome/components/sensor/sensor.h"
 #ifdef USE_SWITCH
@@ -20,11 +20,6 @@ using namespace esphome::switch_;
 using namespace mhi_ac;
 
 static const char* TAG = "mhi_ac_ctrl";
-int gpio_mosi_pin;
-int gpio_miso_pin;
-int gpio_sclk_pin;
-int gpio_cs_in_pin;
-int gpio_cs_out_pin;
 
 class MhiFrameErrors : public Sensor {
 public:
@@ -165,11 +160,22 @@ public:
 class MhiAcCtrl : public climate::Climate,
                   public Component {
 public:
-    void set_mosi_pin(InternalGPIOPin *pin) { gpio_mosi_pin = pin->get_pin(); }
-    void set_miso_pin(InternalGPIOPin *pin) { gpio_miso_pin = pin->get_pin(); }
-    void set_sclk_pin(InternalGPIOPin *pin) { gpio_sclk_pin = pin->get_pin(); }
-    void set_cs_in_pin(InternalGPIOPin *pin) { gpio_cs_in_pin = pin->get_pin(); }
-    void set_cs_out_pin(InternalGPIOPin *pin) { gpio_cs_out_pin = pin->get_pin(); }
+    void set_mosi_pin(InternalGPIOPin *pin) {
+        this->ac_config_.mosi = static_cast<gpio_num_t>(pin->get_pin());
+    }
+    void set_miso_pin(InternalGPIOPin *pin) {
+        this->ac_config_.miso = static_cast<gpio_num_t>(pin->get_pin());
+    }
+    void set_sclk_pin(InternalGPIOPin *pin) {
+        this->ac_config_.sclk = static_cast<gpio_num_t>(pin->get_pin());
+    }
+    void set_cs_in_pin(InternalGPIOPin *pin) {
+        this->ac_config_.cs_in = static_cast<gpio_num_t>(pin->get_pin());
+    }
+    void set_cs_out_pin(InternalGPIOPin *pin) {
+        this->ac_config_.cs_out = static_cast<gpio_num_t>(pin->get_pin());
+    }
+
     void setup() override
     {
         auto restore = this->restore_state_();
@@ -189,7 +195,7 @@ public:
         //current_power.set_unit_of_measurement("A");
         //current_power.set_accuracy_decimals(2);
 
-        mhi_ac_ctrl_core_init();
+        mhi_ac_ctrl_core_init(this->ac_config_);
     }
 
     void loop() override
@@ -426,6 +432,7 @@ protected:
     MhiFrameErrors *frame_errors_sensor_;
     MhiTotalEnergy *total_energy_sensor_;
     MhiPower *power_sensor_;
+    Config ac_config_;
 
 public:
 #ifdef USE_SELECT
