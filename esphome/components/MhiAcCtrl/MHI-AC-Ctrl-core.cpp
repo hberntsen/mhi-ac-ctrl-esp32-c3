@@ -319,74 +319,11 @@ static void mhi_poll_task(void *arg)
 
     uint8_t mosi_frame[MHI_FRAME_LEN];
 
-    // configuration for the SPI bus
-    spi_bus_config_t buscfg={
-        .mosi_io_num = GPIO_MOSI,
-        .miso_io_num = GPIO_MISO,
-        .sclk_io_num = GPIO_SCLK,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1,
-        .flags = SPICOMMON_BUSFLAG_GPIO_PINS | SPICOMMON_BUSFLAG_SLAVE,
-    };
-
-    // configuration for the SPI slave interface
-    spi_slave_interface_config_t slvcfg={
-        .spics_io_num = GPIO_CS_IN,
-        .flags = SPI_SLAVE_BIT_LSBFIRST,
-        .queue_size = 1,
-        .mode = 3,                    //CPOL=1, CPHA=1
-    };
-
     spi_slave_transaction_t spi_slave_trans;
     spi_slave_transaction_t* spi_slave_trans_out;       // needed for spi_slave_get_trans_result which needs a pointer to a pointer
 
-    // initialize SPI slave interface
-    err = spi_slave_initialize(RCV_HOST, &buscfg, &slvcfg, SPI_DMA_CH_AUTO);    // can't disable DMA. no comms if you do...
-
-    ESP_ERROR_CHECK(err);
-
-
-    // Select and initialize basic parameters of the timer
-    timer_config_t config = {
-        .alarm_en = TIMER_ALARM_DIS,
-        .counter_en = TIMER_PAUSE,
-        .counter_dir = TIMER_COUNT_UP,
-        .auto_reload = TIMER_AUTORELOAD_DIS,
-        .divider = TIMER_DIVIDER,
-    }; // default clock source is APB
-    timer_init(TIMER_GROUP_0, TIMER_0, &config);
-
-    // Configure the alarm value (in milliseconds) and the interrupt on alarm. there is a delay between each frame of 40ms.
-    //  so we set the alarm to 20ms. once the alarm triggers, spi_slave_queue_trans is called which will get the data from the next spi packet. This is also the point to toggle the CS line to mark the end/start of a SPI transaction.
-    timer_set_alarm_value(TIMER_GROUP_0, TIMER_0, 20 * TIMER_SCALE_MS);
-    timer_enable_intr(TIMER_GROUP_0, TIMER_0);
     timer_isr_callback_add(TIMER_GROUP_0, TIMER_0, timer_group_isr_callback, &spi_slave_trans, 0);
     timer_start(TIMER_GROUP_0, TIMER_0);
-
-    gpio_config_t io_conf = {};
-    io_conf.mode = GPIO_MODE_INPUT;
-    io_conf.pin_bit_mask = (1ULL<<GPIO_SCLK);
-    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    io_conf.pull_up_en = GPIO_PULLUP_ENABLE;                                     // required to prevent abort() caused by floating pin when daughtboard not connected
-    io_conf.intr_type = GPIO_INTR_LOW_LEVEL;                    // when this is set to NEGEDGE, DMA sometimes doesn't read the last 4 bytes
-                                                                // if not connected to AC (plugged in) when starting, it will crash - probably because it
-                                                                // immediately calls an interrupt
-    gpio_config(&io_conf);
-
-
-
-    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
-    gpio_isr_handler_add(GPIO_SCLK, gpio_isr_handler, NULL);
-    //gpio_intr_disable(GPIO_SCLK);
-    gpio_intr_enable(GPIO_SCLK);
-
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = (1ULL<<GPIO_CS_OUT);
-    io_conf.intr_type =GPIO_INTR_DISABLE;
-    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-    gpio_config(&io_conf);
-
-    gpio_set_level(GPIO_CS_OUT, 1);
 
     //Set up a transaction of MHI_FRAME_LEN bytes to send/receive
     spi_slave_trans.length = MHI_FRAME_LEN*8;
@@ -636,8 +573,69 @@ static void mhi_poll_task(void *arg)
 }
 
 void mhi_ac_ctrl_core_init() {
+    esp_err_t err;
+
     miso_semaphore_handle = xSemaphoreCreateMutexStatic( &miso_semaphore_buffer );
     snapshot_semaphore_handle = xSemaphoreCreateBinaryStatic( &snapshot_semaphore_buffer );
+
+    // configuration for the SPI bus
+    spi_bus_config_t buscfg = {
+        .mosi_io_num = GPIO_MOSI,
+        .miso_io_num = GPIO_MISO,
+        .sclk_io_num = GPIO_SCLK,
+        .quadwp_io_num = -1,
+        .quadhd_io_num = -1,
+        .flags = SPICOMMON_BUSFLAG_GPIO_PINS | SPICOMMON_BUSFLAG_SLAVE,
+    };
+
+    // configuration for the SPI slave interface
+    spi_slave_interface_config_t slvcfg = {
+        .spics_io_num = GPIO_CS_IN,
+        .flags = SPI_SLAVE_BIT_LSBFIRST,
+        .queue_size = 1,
+        .mode = 3,                    //CPOL=1, CPHA=1
+    };
+
+    // initialize SPI slave interface
+    err = spi_slave_initialize(RCV_HOST, &buscfg, &slvcfg, SPI_DMA_CH_AUTO);    // can't disable DMA. no comms if you do...
+    ESP_ERROR_CHECK(err);
+
+    // Select and initialize basic parameters of the timer
+    timer_config_t config = {
+        .alarm_en = TIMER_ALARM_DIS,
+        .counter_en = TIMER_PAUSE,
+        .counter_dir = TIMER_COUNT_UP,
+        .auto_reload = TIMER_AUTORELOAD_DIS,
+        .divider = TIMER_DIVIDER,
+    }; // default clock source is APB
+    timer_init(TIMER_GROUP_0, TIMER_0, &config);
+
+    // Configure the alarm value (in milliseconds) and the interrupt on alarm. there is a delay between each frame of 40ms.
+    //  so we set the alarm to 20ms. once the alarm triggers, spi_slave_queue_trans is called which will get the data from the next spi packet. This is also the point to toggle the CS line to mark the end/start of a SPI transaction.
+    timer_set_alarm_value(TIMER_GROUP_0, TIMER_0, 20 * TIMER_SCALE_MS);
+    timer_enable_intr(TIMER_GROUP_0, TIMER_0);
+
+    gpio_config_t io_conf = {};
+    io_conf.mode = GPIO_MODE_INPUT;
+    io_conf.pin_bit_mask = (1ULL<<GPIO_SCLK);
+io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_ENABLE;                                     // required to prevent abort() caused by floating pin when daughtboard not connected
+    io_conf.intr_type = GPIO_INTR_LOW_LEVEL;                    // when this is set to NEGEDGE, DMA sometimes doesn't read the last 4 bytes
+                                                                // if not connected to AC (plugged in) when starting, it will crash - probably because it
+                                                                // immediately calls an interrupt
+    gpio_config(&io_conf);
+
+    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
+    gpio_isr_handler_add(GPIO_SCLK, gpio_isr_handler, NULL);
+    gpio_intr_enable(GPIO_SCLK);
+
+    io_conf.mode = GPIO_MODE_OUTPUT;
+    io_conf.pin_bit_mask = (1ULL<<GPIO_CS_OUT);
+    io_conf.intr_type =GPIO_INTR_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    gpio_config(&io_conf);
+
+    gpio_set_level(GPIO_CS_OUT, 1);
 
     xTaskCreatePinnedToCore(
                         mhi_poll_task,          // Function to implement the task
