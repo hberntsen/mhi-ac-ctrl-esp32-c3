@@ -528,7 +528,9 @@ void mhi_ac_ctrl_core_init(const Config& config) {
         .counter_dir = TIMER_COUNT_UP,
         .auto_reload = TIMER_AUTORELOAD_DIS,
         .divider = TIMER_DIVIDER,
+        #if SOC_TIMER_GROUP_SUPPORT_XTAL
         .clk_src = TIMER_SRC_CLK_APB
+        #endif    
     };
     timer_init(TIMER_GROUP_0, TIMER_0, &timer_config);
 
