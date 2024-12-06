@@ -32,7 +32,6 @@ static uint8_t miso_frame[] = { 0xA9, 0x00, 0x07, 0x00, 0x00, 0x00, 0xff, 0x00, 
 static SemaphoreHandle_t miso_semaphore_handle;
 static StaticSemaphore_t miso_semaphore_buffer;
 
-static int gpio_status = 0;
 static int ready = 0;
 static bool active_mode = false;
 
