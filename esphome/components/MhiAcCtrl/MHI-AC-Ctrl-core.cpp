@@ -281,7 +281,7 @@ void mhi_ac_ctrl_core_vanes_updown_set(ACVanes new_state) {
     if(new_state == ACVanes::Swing) {
         miso_frame[DB0] |= 0x40; // Enable swing
     } else {
-        miso_frame[DB0] &= ~0x40; 
+        miso_frame[DB0] &= ~0x40;
         miso_frame[DB1] |= 0x80; // Pos set
         miso_frame[DB1] |= (static_cast<uint8_t>(new_state)) << 4;
     }

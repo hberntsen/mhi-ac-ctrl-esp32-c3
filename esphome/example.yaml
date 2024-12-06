@@ -15,7 +15,7 @@ external_components:
 
 esp32:
   board: esp32-c3-devkitm-1
-  framework: 
+  framework:
     type: esp-idf
 
 # Enable logging
@@ -74,7 +74,7 @@ switch:
       id: ${device_id}_active_mode
 
 status_led:
-  pin: 
+  pin:
     #white led, off when all good
     number: 19
 
