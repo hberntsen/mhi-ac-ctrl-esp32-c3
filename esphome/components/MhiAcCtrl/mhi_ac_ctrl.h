@@ -300,9 +300,18 @@ public:
             fan_old_sensor_->publish_state((uint8_t)mhi_ac_ctrl_core_fan_old_get());
         }
 
-        if(mhi_ac_ctrl_core_current_temperature_changed() || std::isnan(this->current_temperature)) {
-            this->current_temperature = mhi_ac_ctrl_core_current_temperature_get();
-            publish_self_state |= !std::isnan(this->current_temperature);
+        if(climate_current_temperature_sensor_) {
+          if(mhi_ac_ctrl_core_current_temperature_changed() || std::isnan(climate_current_temperature_sensor_->get_raw_state())) {
+            climate_current_temperature_sensor_->publish_state(mhi_ac_ctrl_core_current_temperature_get());
+          }
+
+          const float new_temperature = climate_current_temperature_sensor_->get_state();
+          publish_self_state |= current_temperature != new_temperature && !(std::isnan(current_temperature) && std::isnan(new_temperature));
+          current_temperature = new_temperature;
+        } else if(mhi_ac_ctrl_core_current_temperature_changed() || std::isnan(current_temperature)) {
+          // Use raw value directly
+          current_temperature = mhi_ac_ctrl_core_current_temperature_get();
+          publish_self_state |= !std::isnan(current_temperature);
         }
 
         if(this->mode != climate::CLIMATE_MODE_HEAT && this->target_temperature < 18) {
@@ -424,6 +433,7 @@ protected:
 
     SUB_SENSOR(fan_raw)
     SUB_SENSOR(fan_old)
+    SUB_SENSOR(climate_current_temperature)
 
 protected:
 #ifdef USE_SELECT

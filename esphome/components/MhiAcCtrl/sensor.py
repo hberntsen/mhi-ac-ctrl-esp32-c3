@@ -3,10 +3,13 @@ import esphome.config_validation as cv
 from esphome.components import sensor
 from esphome.const import (
     CONF_POWER,
+    DEVICE_CLASS_TEMPERATURE,
     STATE_CLASS_TOTAL_INCREASING,
+    UNIT_CELSIUS,
     UNIT_WATT,
     UNIT_WATT_HOURS,
     ICON_FAN,
+    ICON_THERMOMETER,
     DEVICE_CLASS_ENERGY,
     DEVICE_CLASS_POWER,
 )
@@ -16,6 +19,7 @@ CONF_FRAME_ERRORS = "frame_errors"
 CONF_FAN_RAW = "fan_raw"
 CONF_FAN_OLD = "fan_old"
 CONF_TOTAL_ENERGY = "total_energy"
+CONF_CLIMATE_CURRENT_TEMPERATURE = "climate_current_temperature"
 
 TYPES = [
     CONF_FAN_RAW,
@@ -23,6 +27,7 @@ TYPES = [
     CONF_TOTAL_ENERGY,
     CONF_POWER,
     CONF_FRAME_ERRORS,
+    CONF_CLIMATE_CURRENT_TEMPERATURE
 ]
 
 MhiFrameErrors = cg.global_ns.class_("MhiFrameErrors", cg.Component, sensor.Sensor)
@@ -49,6 +54,11 @@ CONFIG_SCHEMA = cv.All(
             ),
             cv.Optional(CONF_FRAME_ERRORS): sensor.sensor_schema(
                 class_=MhiFrameErrors, state_class=STATE_CLASS_TOTAL_INCREASING
+            ),
+            cv.Optional(CONF_CLIMATE_CURRENT_TEMPERATURE): sensor.sensor_schema(
+                unit_of_measurement=UNIT_CELSIUS,
+                device_class=DEVICE_CLASS_TEMPERATURE,
+                icon=ICON_THERMOMETER,
             ),
         }
     )

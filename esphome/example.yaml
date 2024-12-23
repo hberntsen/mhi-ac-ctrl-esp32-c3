@@ -60,6 +60,21 @@ sensor:
       name: ${device_name} Power
     frame_errors:
       name: ${device_name} Frame errors
+    # Special sensor to filter out bursts of (small) temperature changes. When
+    # this sensor is present, the current temperature in the climate component
+    # will use the filtered value from this sensor..
+    #
+    # Use case: filtering out temperature jitter. See
+    # https://github.com/hberntsen/mhi-ac-ctrl-esp32-c3/issues/5
+    climate_current_temperature:
+      # Only id, no name so it won't be sent to home assistant as separate sensor
+      id: climate_current_temperature
+      filters:
+        # Check for new temperatures every 10 seconds
+        - heartbeat: 10s
+        # Home assistant does not show decimals
+        - round: 0
+        # The climate component will only send updates if the value is different
 
 #  - platform: homeassistant
 #    name: "Voltage"
