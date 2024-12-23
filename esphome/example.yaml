@@ -50,8 +50,6 @@ select:
 sensor:
   - platform: MhiAcCtrl
     mhi_ac_ctrl_id: ${mhi_device_id}
-    fan_raw:
-      name: ${device_name} fan raw
     total_energy:
       name: ${device_name} Energy
       filters:

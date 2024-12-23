@@ -102,7 +102,6 @@ ACMode mhi_ac_ctrl_core_mode_get();
 bool mhi_ac_ctrl_core_fan_changed();
 void mhi_ac_ctrl_core_fan_set(ACFan fan);
 ACFan mhi_ac_ctrl_core_fan_get();
-uint8_t mhi_ac_ctrl_core_fan_get_raw();
 
 bool mhi_ac_ctrl_core_current_temperature_changed();
 float mhi_ac_ctrl_core_current_temperature_get();

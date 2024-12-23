@@ -292,8 +292,6 @@ public:
                 default:
                     break;
             }
-            if(fan_raw_sensor_)
-                fan_raw_sensor_->publish_state(mhi_ac_ctrl_core_fan_get_raw());
         }
 
         if(climate_current_temperature_sensor_) {
@@ -427,7 +425,6 @@ protected:
     const float temperature_step_ { 1.0f };
     const std::string custom_fan_ultra_low = std::string("Ultra Low");
 
-    SUB_SENSOR(fan_raw)
     SUB_SENSOR(climate_current_temperature)
 
 protected:

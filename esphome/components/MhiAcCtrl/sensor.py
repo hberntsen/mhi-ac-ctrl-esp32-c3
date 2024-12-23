@@ -16,12 +16,10 @@ from esphome.const import (
 from . import MhiAcCtrl, CONF_MHI_AC_CTRL_ID
 
 CONF_FRAME_ERRORS = "frame_errors"
-CONF_FAN_RAW = "fan_raw"
 CONF_TOTAL_ENERGY = "total_energy"
 CONF_CLIMATE_CURRENT_TEMPERATURE = "climate_current_temperature"
 
 TYPES = [
-    CONF_FAN_RAW,
     CONF_TOTAL_ENERGY,
     CONF_POWER,
     CONF_FRAME_ERRORS,
@@ -37,7 +35,6 @@ CONFIG_SCHEMA = cv.All(
         {
             cv.GenerateID(): cv.declare_id(MhiAcCtrl),
             cv.GenerateID(CONF_MHI_AC_CTRL_ID): cv.use_id(MhiAcCtrl),
-            cv.Optional(CONF_FAN_RAW): sensor.sensor_schema(icon=ICON_FAN),
             cv.Optional(CONF_TOTAL_ENERGY): sensor.sensor_schema(
                 class_=MhiTotalEnergy,
                 unit_of_measurement=UNIT_WATT_HOURS,

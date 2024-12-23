@@ -191,10 +191,6 @@ ACFan mhi_ac_ctrl_core_fan_get() {
     }
 }
 
-uint8_t mhi_ac_ctrl_core_fan_get_raw() {
-    return mosi_frame_snapshot[DB1] & FAN_MASK;
-}
-
 bool mhi_ac_ctrl_core_current_temperature_changed() {
     return mosi_frame_snapshot[DB3] != mosi_frame_snapshot_prev[DB3];
 }
