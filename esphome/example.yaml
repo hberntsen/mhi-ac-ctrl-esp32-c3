@@ -52,8 +52,6 @@ sensor:
     mhi_ac_ctrl_id: ${mhi_device_id}
     fan_raw:
       name: ${device_name} fan raw
-    fan_old:
-      name: ${device_name} fan old
     total_energy:
       name: ${device_name} Energy
       filters:

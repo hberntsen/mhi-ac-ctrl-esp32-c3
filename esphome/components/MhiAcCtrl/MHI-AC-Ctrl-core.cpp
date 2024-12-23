@@ -191,27 +191,6 @@ ACFan mhi_ac_ctrl_core_fan_get() {
     }
 }
 
-bool mhi_ac_ctrl_core_fan_old_changed() {
-    return (mosi_frame_snapshot[DB1] & FAN_DB1_MASK) != (mosi_frame_snapshot_prev[DB1] & FAN_DB1_MASK)
-        || (mosi_frame_snapshot[DB6] & FAN_DB6_MASK) != (mosi_frame_snapshot_prev[DB6] & FAN_DB6_MASK);
-}
-
-uint8_t mhi_ac_ctrl_core_fan_old_get() {
-    if(mosi_frame_snapshot[DB6] & FAN_SPEED_4) {
-        return 100;
-    }
-    uint8_t db1_value = mosi_frame_snapshot[DB1] & FAN_DB1_MASK;
-    switch(db1_value) {
-        case FAN_SPEED_1:
-            return 25;
-        case FAN_SPEED_2:
-            return 50;
-        case FAN_SPEED_3:
-            return 75;
-    }
-    return 0xff;
-}
-
 uint8_t mhi_ac_ctrl_core_fan_get_raw() {
     return mosi_frame_snapshot[DB1] & FAN_MASK;
 }

@@ -296,10 +296,6 @@ public:
                 fan_raw_sensor_->publish_state(mhi_ac_ctrl_core_fan_get_raw());
         }
 
-        if(fan_old_sensor_ && mhi_ac_ctrl_core_fan_old_changed()) {
-            fan_old_sensor_->publish_state((uint8_t)mhi_ac_ctrl_core_fan_old_get());
-        }
-
         if(climate_current_temperature_sensor_) {
           if(mhi_ac_ctrl_core_current_temperature_changed() || std::isnan(climate_current_temperature_sensor_->get_raw_state())) {
             climate_current_temperature_sensor_->publish_state(mhi_ac_ctrl_core_current_temperature_get());
@@ -432,7 +428,6 @@ protected:
     const std::string custom_fan_ultra_low = std::string("Ultra Low");
 
     SUB_SENSOR(fan_raw)
-    SUB_SENSOR(fan_old)
     SUB_SENSOR(climate_current_temperature)
 
 protected:
