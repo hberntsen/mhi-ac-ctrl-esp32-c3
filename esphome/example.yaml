@@ -56,6 +56,8 @@ sensor:
       name: ${device_name} fan old
     total_energy:
       name: ${device_name} Energy
+      filters:
+        - throttle: 60s
     power:
       name: ${device_name} Power
     frame_errors:
