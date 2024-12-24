@@ -380,13 +380,11 @@ static void mhi_poll_task(void *arg)
 
 
             frame_error = true;
-            //TODO: store CRC error counter for home assistant?
         } else if ( (mosi_frame[CBH] != (rx_checksum>>8 & 0xff)) | (mosi_frame[CBL] != (rx_checksum & 0xff)) ) {
             ESP_LOGW(TAG, "packet: %5d wrong MOSI checksum. calculated 0x%04x. MOSI[18]:0x%02x MOSI[19]:0x%02x",
                         packet_cnt, rx_checksum, mosi_frame[18], mosi_frame[19]);
 
             frame_error = true;
-            //TODO: store CRC error counter for home assistant?
         }
 
         if (frame_error) {
