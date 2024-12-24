@@ -8,7 +8,7 @@
 #include <math.h>
 #include <string.h>
 
-#include "driver/timer.h"
+#include "driver/gptimer.h"
 #include "driver/spi_slave.h"
 #include "driver/gpio.h"
 
@@ -23,9 +23,7 @@ using namespace mhi_ac::internal;
 
 #define ESP_INTR_FLAG_DEFAULT       0                                           // default to allocating a non-shared interrupt of level 1, 2 or 3.
 
-#define TIMER_DIVIDER               (16)                                        // hardware timer clock divider
-#define TIMER_SCALE_MS              (TIMER_BASE_CLK / TIMER_DIVIDER / 1000)     // convert counter value to milliseconds
-
+gptimer_handle_t cs_timer = NULL;
 static TaskHandle_t mhi_poll_task_handle = NULL;
 //                              sb0   sb1   sb2   db0   db1   db2   db3   db4   db5   db6   db7   db8   db9  db10  db11  db12  db13 (db14  chkH  chkL not needed)
 static uint8_t miso_frame[] = { 0xA9, 0x00, 0x07, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x0f };
@@ -48,16 +46,29 @@ MHIEnergy mhi_energy(230);
 
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
-    timer_set_counter_value(TIMER_GROUP_0, TIMER_0, 0);
-    timer_set_alarm(TIMER_GROUP_0, TIMER_0, TIMER_ALARM_EN);
+  uint64_t current_timer_value;
+  // We need to know whether the timer has already been started. If we start it when it is already started, we get the
+  // following in the logs:
+  // > gptimer: gptimer_start(348): timer is not enabled in the logs
+  //
+  // There is no direct API to check the status, so use the raw count instead
+  ESP_ERROR_CHECK(gptimer_get_raw_count(cs_timer, &current_timer_value));
+  if(current_timer_value == 0) {
+    gptimer_start(cs_timer);
+  }
 }
 
-static bool IRAM_ATTR timer_group_isr_callback(void *args)
+static bool IRAM_ATTR gptimer_isr_callback(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata, void *user_ctx)
 {
+    // Stop timer, gpio isr will turn it back on
+    gptimer_stop(timer);
+    // Set to 0 to tell the GPIO isr that the timer is not running
+    gptimer_set_raw_count(cs_timer, 0);
+
     // Trigger Chip Select
     gpio_set_level(gpio_cs_out, 1);
     if(ready) {
-        spi_slave_transaction_t *t = (spi_slave_transaction_t *) args;
+        spi_slave_transaction_t *t = (spi_slave_transaction_t *) user_ctx;
         spi_slave_queue_trans(RCV_HOST, t, 0);
     }
     gpio_set_level(gpio_cs_out, 0);
@@ -271,8 +282,13 @@ static void mhi_poll_task(void *arg)
     spi_slave_transaction_t spi_slave_trans;
     spi_slave_transaction_t* spi_slave_trans_out;       // needed for spi_slave_get_trans_result which needs a pointer to a pointer
 
-    timer_isr_callback_add(TIMER_GROUP_0, TIMER_0, timer_group_isr_callback, &spi_slave_trans, 0);
-    timer_start(TIMER_GROUP_0, TIMER_0);
+    gptimer_event_callbacks_t timer_callbacks = {
+      .on_alarm = gptimer_isr_callback
+    };
+    ESP_ERROR_CHECK(gptimer_register_event_callbacks(cs_timer, &timer_callbacks, &spi_slave_trans));
+    ESP_ERROR_CHECK(gptimer_enable(cs_timer));
+    // Set the count to 0, so the gpio ISR will start the timer
+    ESP_ERROR_CHECK(gptimer_set_raw_count(cs_timer, 0));
 
     //Set up a transaction of MHI_FRAME_LEN bytes to send/receive
     spi_slave_trans.length = MHI_FRAME_LEN*8;
@@ -480,24 +496,31 @@ void mhi_ac_ctrl_core_init(const Config& config) {
     err = spi_slave_initialize(RCV_HOST, &buscfg, &slvcfg, SPI_DMA_CH_AUTO);    // can't disable DMA. no comms if you do...
     ESP_ERROR_CHECK(err);
 
-    // Select and initialize basic parameters of the timer
-    timer_config_t timer_config = {
-        .alarm_en = TIMER_ALARM_DIS,
-        .counter_en = TIMER_PAUSE,
-        .intr_type = TIMER_INTR_LEVEL,
-        .counter_dir = TIMER_COUNT_UP,
-        .auto_reload = TIMER_AUTORELOAD_DIS,
-        .divider = TIMER_DIVIDER,
-        #if SOC_TIMER_GROUP_SUPPORT_XTAL
-        .clk_src = TIMER_SRC_CLK_APB
-        #endif    
+    // Set up timer
+    gptimer_config_t timer_config = {
+      .clk_src = GPTIMER_CLK_SRC_APB,
+      .direction = GPTIMER_COUNT_UP,
+      .resolution_hz = 1000000, // Plenty of resolution to encode a rough 20ms ;)
     };
-    timer_init(TIMER_GROUP_0, TIMER_0, &timer_config);
-
-    // Configure the alarm value (in milliseconds) and the interrupt on alarm. there is a delay between each frame of 40ms.
-    //  so we set the alarm to 20ms. once the alarm triggers, spi_slave_queue_trans is called which will get the data from the next spi packet. This is also the point to toggle the CS line to mark the end/start of a SPI transaction.
-    timer_set_alarm_value(TIMER_GROUP_0, TIMER_0, 20 * TIMER_SCALE_MS);
-    timer_enable_intr(TIMER_GROUP_0, TIMER_0);
+    ESP_ERROR_CHECK(gptimer_new_timer(&timer_config, &cs_timer));
+    gptimer_alarm_config_t timer_alarm_config = {
+      // Configure the alarm value (in milliseconds) and the interrupt on alarm. there is a gap between each frame of 40ms.
+      // So we set the alarm to 20ms. once the alarm triggers, spi_slave_queue_trans is called which will get the data
+      // from the hardware spi. This is also the point to toggle the CS line to mark the end/start of a SPI
+      // transaction to the hardware, as it won't work without.
+      //
+      .alarm_count = 20 * (timer_config.resolution_hz / 1000),
+      .reload_count = 0,
+      .flags = {
+        // We manually reload based on the clock signal we get from the AC
+        .auto_reload_on_alarm = false,
+      }
+    };
+    ESP_ERROR_CHECK(gptimer_set_alarm_action(cs_timer, &timer_alarm_config));
+    // The ISR uses the counter value to determine whether it is already running. The ISR will probably trigger before
+    // we are ready in the mhi_poll_task, so set a non-zero value so it assumes it has already been started. The
+    // mhi_poll_task will prepare the timer with a 0 count.
+    ESP_ERROR_CHECK(gptimer_set_raw_count(cs_timer, timer_config.resolution_hz));
 
     gpio_config_t io_conf = {};
     io_conf.mode = GPIO_MODE_INPUT;
