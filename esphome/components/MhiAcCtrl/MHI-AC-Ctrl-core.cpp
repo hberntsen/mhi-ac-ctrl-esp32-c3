@@ -54,13 +54,11 @@ static void IRAM_ATTR gpio_isr_handler(void* arg)
 
 static bool IRAM_ATTR timer_group_isr_callback(void *args)
 {
-    esp_err_t err;
-    BaseType_t xHigherPriorityTaskWoken;
     // Trigger Chip Select
     gpio_set_level(gpio_cs_out, 1);
     if(ready) {
         spi_slave_transaction_t *t = (spi_slave_transaction_t *) args;
-        err = spi_slave_queue_trans(RCV_HOST, t, 0);
+        spi_slave_queue_trans(RCV_HOST, t, 0);
     }
     gpio_set_level(gpio_cs_out, 0);
     return false;
