@@ -156,19 +156,6 @@ bool mhi_ac_ctrl_core_fan_changed() {
 }
 void mhi_ac_ctrl_core_fan_set(ACFan fan) {
     xSemaphoreTake(miso_semaphore_handle, portMAX_DELAY);
-    //miso_frame[DB1] &= ~FAN_DB1_MASK;
-    //miso_frame[DB6] &= ~FAN_DB6_MASK;
-    //switch(fan) {
-        //case ACFan::speed1:
-        //case ACFan::speed2:
-        //case ACFan::speed3:
-            //miso_frame[DB1] |= (uint8_t) fan;
-            //break;
-        //case ACFan::speed4:
-            //miso_frame[DB1] |= (uint8_t) ACFan::speed3;
-            //miso_frame[DB6] |= (uint8_t) ACFan::speed4;
-            //break;
-    //}
     miso_frame[DB1] &= ~FAN_MASK;
     miso_frame[DB1] |= (uint8_t) fan;
     miso_frame[DB1] |= 1 << 3;              // set bit for fan speed on DB1
