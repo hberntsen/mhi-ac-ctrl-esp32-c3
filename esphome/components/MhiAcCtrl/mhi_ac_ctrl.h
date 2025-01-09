@@ -178,19 +178,6 @@ public:
 
     void setup() override
     {
-        auto restore = this->restore_state_();
-        if (restore.has_value()) {
-            restore->apply(this);
-        } else {
-            // restore from defaults
-            //this->mode = climate::CLIMATE_MODE_OFF;
-            //// initialize target temperature to some value so that it's not NAN
-            //this->target_temperature = roundf(clamp(
-                //this->current_temperature, this->minimum_temperature_, this->maximum_temperature_));
-            //this->fan_mode = climate::CLIMATE_FAN_AUTO;
-            //this->swing_mode = climate::CLIMATE_SWING_OFF;
-        }
-
         //current_power.set_icon("mdi:current-ac");
         //current_power.set_unit_of_measurement("A");
         //current_power.set_accuracy_decimals(2);
@@ -318,10 +305,6 @@ public:
         if(publish_self_state) {
             this->publish_state();
         }
-    }
-
-    void dump_config() override
-    {
     }
 
 protected:
