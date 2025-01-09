@@ -75,6 +75,8 @@ sensor:
 #  - platform: homeassistant
 #    name: "Voltage"
 #    entity_id: sensor.voltage_l3
+#    filters:
+#      - filter_out: nan
 #    on_value:
 #      then:
 #        - lambda: 'mhi_energy.set_voltage(x);'

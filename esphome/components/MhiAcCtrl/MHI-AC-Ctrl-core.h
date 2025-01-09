@@ -164,10 +164,6 @@ public:
         bool exchanged;
         uint64_t new_total;
         uint64_t current_total;
-        // avoid huge spikes of 500Wh: 500 /( 14/51 * 10**(-6) / 3600)
-        if(additional_energy > 6557142857142) {
-            return;
-        }
         do {
             uint64_t current_total = total_energy.load();
             new_total = current_total + additional_energy;
