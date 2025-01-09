@@ -216,8 +216,9 @@ public:
         if(vanes_ud_select_)
             vanes_ud_select_->loop();
 #endif
+        bool first_time = std::isnan(this->target_temperature);
 
-        if(mhi_ac_ctrl_core_target_temperature_changed()) {
+        if(mhi_ac_ctrl_core_target_temperature_changed() || first_time) {
             publish_self_state = true;
             this->target_temperature = mhi_ac_ctrl_core_target_temperature_get();
         }
@@ -225,7 +226,8 @@ public:
         if(mhi_ac_ctrl_core_power_changed()
                 || mhi_ac_ctrl_core_mode_changed()
                 || mhi_ac_ctrl_core_compressor_changed()
-                || mhi_ac_ctrl_core_heatcool_changed()) {
+                || mhi_ac_ctrl_core_heatcool_changed()
+                || first_time) {
             publish_self_state = true;
 
             if(mhi_ac_ctrl_core_power_get() == ACPower::power_off) {
@@ -271,7 +273,7 @@ public:
             }
         }
 
-        if(mhi_ac_ctrl_core_fan_changed()) {
+        if(mhi_ac_ctrl_core_fan_changed() || first_time) {
             publish_self_state = true;
             switch(mhi_ac_ctrl_core_fan_get()) {
                 case ACFan::speed_1:
