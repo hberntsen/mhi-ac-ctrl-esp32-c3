@@ -271,13 +271,14 @@ static void mhi_poll_task(void *arg)
 
     uint16_t rx_checksum = 0;
     uint16_t tx_checksum = 0;
-    bool frame_diff = false;
 
     // use WORD_ALIGNED_ATTR when using DMA buffer
-    WORD_ALIGNED_ATTR uint8_t recvbuf[MHI_FRAME_LEN];
+    // use 2 recv buffers to be able to check for differences
     WORD_ALIGNED_ATTR uint8_t sendbuf[MHI_FRAME_LEN];
-
-    uint8_t mosi_frame[MHI_FRAME_LEN];
+    WORD_ALIGNED_ATTR uint8_t recvbuf[MHI_FRAME_LEN];
+    WORD_ALIGNED_ATTR uint8_t recvbuf2[MHI_FRAME_LEN];
+    uint8_t* mosi_frame_prev = recvbuf2;
+    uint8_t* mosi_frame = recvbuf;
 
     spi_slave_transaction_t spi_slave_trans;
     spi_slave_transaction_t* spi_slave_trans_out;       // needed for spi_slave_get_trans_result which needs a pointer to a pointer
@@ -293,7 +294,7 @@ static void mhi_poll_task(void *arg)
     //Set up a transaction of MHI_FRAME_LEN bytes to send/receive
     spi_slave_trans.length = MHI_FRAME_LEN*8;
     spi_slave_trans.tx_buffer = sendbuf;
-    spi_slave_trans.rx_buffer = recvbuf;
+    spi_slave_trans.rx_buffer = mosi_frame;
 
     while(1) {
         if (err) {
@@ -304,7 +305,6 @@ static void mhi_poll_task(void *arg)
             vTaskDelayMs(1000);
         }
         err = 0;
-        frame_diff = false;
         packet_cnt++;
 
         if(!active_mode) {
@@ -359,6 +359,16 @@ static void mhi_poll_task(void *arg)
         //  we can get the data directly from 'spi_slave_trans' instead of 'spi_slave_trans_out->'
         ready = true;
         err = spi_slave_get_trans_result(RCV_HOST, &spi_slave_trans_out, portMAX_DELAY);
+        // swap buffers
+        if(spi_slave_trans.rx_buffer == recvbuf) {
+          mosi_frame = recvbuf;
+          mosi_frame_prev = recvbuf2;
+          spi_slave_trans.rx_buffer = recvbuf2;
+        } else {
+          mosi_frame = recvbuf2;
+          mosi_frame_prev = recvbuf;
+          spi_slave_trans.rx_buffer = recvbuf;
+        }
         ready = false;
         if(err) {
             ESP_LOGE(TAG, "get_trans_result error: %i", err);
@@ -368,21 +378,12 @@ static void mhi_poll_task(void *arg)
           err = true;
           continue;
         }
+        const size_t trans_len_bytes = spi_slave_trans_out->trans_len / 8;
 
         rx_checksum = 0;
-        for (uint8_t byte_cnt = 0; byte_cnt < MHI_FRAME_LEN; byte_cnt++) {
-            // calculate checksum
-            if (byte_cnt < 18){
-                rx_checksum += recvbuf[byte_cnt];
-            }
-
-            // check if any bytes have changed
-            if (mosi_frame[byte_cnt] != recvbuf[byte_cnt]) {
-                mosi_frame[byte_cnt] = recvbuf[byte_cnt];
-                frame_diff = true;
-            }
+        for (uint8_t byte_cnt = 0; byte_cnt < CBH; byte_cnt++) {
+            rx_checksum += mosi_frame[byte_cnt];
         }
-
 
         // check for errors. first byte should be 0x6c
         if ( ((mosi_frame[SB0] & 0xfe) != 0x6c) | (mosi_frame[SB1] != 0x80) | (mosi_frame[SB2] != 0x04) ) {
@@ -403,7 +404,7 @@ static void mhi_poll_task(void *arg)
         // Make snapshot if requested
         if(xSemaphoreTake(snapshot_semaphore_handle, 0) != pdTRUE) {
             memcpy(mosi_frame_snapshot_prev, mosi_frame_snapshot, sizeof(mosi_frame_snapshot_prev));
-            memcpy(mosi_frame_snapshot, recvbuf, sizeof(mosi_frame_snapshot));
+            memcpy(mosi_frame_snapshot, mosi_frame, sizeof(mosi_frame_snapshot));
         }
         xSemaphoreGive(snapshot_semaphore_handle);
 
@@ -442,6 +443,7 @@ static void mhi_poll_task(void *arg)
 
 
         // only need to perform updates if there was a change (with no error) since last frame read
+        const int frame_diff = memcmp(mosi_frame, mosi_frame_prev, trans_len_bytes);
         if (frame_diff) {
             // Evaluate Operating Data and Error Operating Data
             bool MOSI_type_opdata = (mosi_frame[DB10] & 0x30) == 0x10;
