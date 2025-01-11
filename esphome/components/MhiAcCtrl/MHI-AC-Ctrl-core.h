@@ -7,7 +7,8 @@
 // # Config
 #define RCV_HOST                    SPI2_HOST
 
-#define MHI_FRAME_LEN               20
+#define MHI_FRAME_LEN_SHORT         20
+#define MHI_FRAME_LEN_LONG          33
 
 // constants for the frame
 #define MODE_MASK                   0x1C    // auto=0 in homekit        //DB0
@@ -204,7 +205,20 @@ namespace internal {
         DB14 = 17, ///< used on MISO toggle clock bit every 20 frames
         CBH = 18,
         CBL = 19,
-        FRAME_LEN = MHI_FRAME_LEN
+        DB15,
+        DB16,
+        DB17,
+        DB18,
+        DB19,
+        DB20,
+        DB21,
+        DB22,
+        DB23,
+        DB24,
+        DB25,
+        DB26,
+        CBL2,
+        FRAME_LEN = MHI_FRAME_LEN_LONG
     };
 
 } // namespace internal

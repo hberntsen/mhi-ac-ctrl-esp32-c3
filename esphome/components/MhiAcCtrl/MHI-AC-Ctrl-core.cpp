@@ -259,12 +259,63 @@ void mhi_ac_ctrl_core_vanes_updown_set(ACVanes new_state) {
     xSemaphoreGive(miso_semaphore_handle);
 }
 
+static int validate_frame_short(uint8_t* mosi_frame, uint16_t rx_checksum) {
+  if ( ((mosi_frame[SB0] & 0xfe) != 0x6c) | (mosi_frame[SB1] != 0x80) | (mosi_frame[SB2] != 0x04) ) {
+    ESP_LOGW(TAG, "wrong MOSI signature. 0x%02x 0x%02x 0x%02x",
+                mosi_frame[0], mosi_frame[1], mosi_frame[2]);
+
+    return -1;
+  } else if ( (mosi_frame[CBH] != (rx_checksum>>8 & 0xff)) | (mosi_frame[CBL] != (rx_checksum & 0xff)) ) {
+    ESP_LOGW(TAG, "wrong short MOSI checksum. calculated 0x%04x. MOSI[18]:0x%02x MOSI[19]:0x%02x",
+                rx_checksum, mosi_frame[CBH], mosi_frame[CBL]);
+
+    return -2;
+  }
+  return 0;
+}
+
+static int validate_frame_long(uint8_t* mosi_frame, uint8_t rx_checksum) {
+  if(mosi_frame[CBL2] != rx_checksum) {
+    ESP_LOGW(TAG, "wrong long MOSI checksum. calculated 0x%02x. MOSI[32]:0x%02x",
+                rx_checksum, mosi_frame[CBL2]);
+    return -3;
+  }
+  return 0;
+}
+
+static int validate_frame(uint8_t* mosi_frame, uint8_t frame_len) {
+  int err = 0;;
+  uint16_t rx_checksum = 0;
+  // Frame len has been validated before to only be either MHI_FRAME_LEN_LONG or MHI_FRAME_LEN_SHORT
+  for (uint8_t i = 0; i < frame_len; i++) {
+    switch(i) {
+      case CBH:
+        // validate checksum short
+        err = validate_frame_short(mosi_frame, rx_checksum);
+        if(err) {
+          return err;
+        }
+        rx_checksum += mosi_frame[CBH];
+        rx_checksum += mosi_frame[CBL];
+        // skip over CBL
+        i++;
+        break;
+      case CBL2:
+        err = validate_frame_long(mosi_frame, rx_checksum);
+        if(err) {
+          return err;
+        }
+        break;
+      default:
+        rx_checksum += mosi_frame[i];
+    }
+  }
+  return err;
+}
 
 static void mhi_poll_task(void *arg)
 {
     esp_err_t err = 0;
-
-    uint16_t packet_cnt = 0;            // can be removed when diagnostic lines are removed
 
     uint8_t frame = 0;
     bool halfcycle = false;
@@ -274,9 +325,9 @@ static void mhi_poll_task(void *arg)
 
     // use WORD_ALIGNED_ATTR when using DMA buffer
     // use 2 recv buffers to be able to check for differences
-    WORD_ALIGNED_ATTR uint8_t sendbuf[MHI_FRAME_LEN];
-    WORD_ALIGNED_ATTR uint8_t recvbuf[MHI_FRAME_LEN];
-    WORD_ALIGNED_ATTR uint8_t recvbuf2[MHI_FRAME_LEN];
+    WORD_ALIGNED_ATTR uint8_t sendbuf[MHI_FRAME_LEN_LONG];
+    WORD_ALIGNED_ATTR uint8_t recvbuf[MHI_FRAME_LEN_LONG];
+    WORD_ALIGNED_ATTR uint8_t recvbuf2[MHI_FRAME_LEN_LONG];
     uint8_t* mosi_frame_prev = recvbuf2;
     uint8_t* mosi_frame = recvbuf;
 
@@ -292,20 +343,19 @@ static void mhi_poll_task(void *arg)
     ESP_ERROR_CHECK(gptimer_set_raw_count(cs_timer, 0));
 
     //Set up a transaction of MHI_FRAME_LEN bytes to send/receive
-    spi_slave_trans.length = MHI_FRAME_LEN*8;
+    spi_slave_trans.length = MHI_FRAME_LEN_LONG*8;
     spi_slave_trans.tx_buffer = sendbuf;
     spi_slave_trans.rx_buffer = mosi_frame;
 
     while(1) {
         if (err) {
-            ESP_LOGW(TAG, "length: %i, trans len: %i",spi_slave_trans.length, spi_slave_trans.trans_len);
+            ESP_LOGW(TAG, "error %i . trans len: %i", err, spi_slave_trans.trans_len);
             frame_errors++;
 
             // wait a second before retrying communication
             vTaskDelayMs(1000);
         }
         err = 0;
-        packet_cnt++;
 
         if(!active_mode) {
             memset(sendbuf, 0xff, sizeof sendbuf);
@@ -355,10 +405,16 @@ static void mhi_poll_task(void *arg)
         }
 
 
+        // Do an SPI transaction
         // blocking function waiting for the spi results. the hardware timer must reach 20ms and perform an spi transaction
         //  we can get the data directly from 'spi_slave_trans' instead of 'spi_slave_trans_out->'
         ready = true;
         err = spi_slave_get_trans_result(RCV_HOST, &spi_slave_trans_out, portMAX_DELAY);
+        ready = false;
+        if(err) {
+            ESP_LOGE(TAG, "get_trans_result error: %i", err);
+            continue;
+        }
         // swap buffers
         if(spi_slave_trans.rx_buffer == recvbuf) {
           mosi_frame = recvbuf;
@@ -369,36 +425,18 @@ static void mhi_poll_task(void *arg)
           mosi_frame_prev = recvbuf;
           spi_slave_trans.rx_buffer = recvbuf;
         }
-        ready = false;
-        if(err) {
-            ESP_LOGE(TAG, "get_trans_result error: %i", err);
-            continue;
-        }
-        if(spi_slave_trans_out->trans_len != MHI_FRAME_LEN * 8) {
+        // Transaction must be of a supported length
+        if(spi_slave_trans_out->trans_len != MHI_FRAME_LEN_LONG * 8
+            && spi_slave_trans_out->trans_len != MHI_FRAME_LEN_SHORT * 8) {
           err = true;
           continue;
         }
         const size_t trans_len_bytes = spi_slave_trans_out->trans_len / 8;
 
-        rx_checksum = 0;
-        for (uint8_t byte_cnt = 0; byte_cnt < CBH; byte_cnt++) {
-            rx_checksum += mosi_frame[byte_cnt];
-        }
-
-        // check for errors. first byte should be 0x6c
-        if ( ((mosi_frame[SB0] & 0xfe) != 0x6c) | (mosi_frame[SB1] != 0x80) | (mosi_frame[SB2] != 0x04) ) {
-            ESP_LOGW(TAG, "packet: %5d wrong MOSI signature. 0x%02x 0x%02x 0x%02x",
-                        packet_cnt, mosi_frame[0], mosi_frame[1], mosi_frame[2]);
-
-
-            err = true;
-            continue;
-        } else if ( (mosi_frame[CBH] != (rx_checksum>>8 & 0xff)) | (mosi_frame[CBL] != (rx_checksum & 0xff)) ) {
-            ESP_LOGW(TAG, "packet: %5d wrong MOSI checksum. calculated 0x%04x. MOSI[18]:0x%02x MOSI[19]:0x%02x",
-                        packet_cnt, rx_checksum, mosi_frame[18], mosi_frame[19]);
-
-            err = true;
-            continue;
+        // Validate SPI transaction
+        err = validate_frame(mosi_frame, trans_len_bytes);
+        if(err != 0) {
+          continue;
         }
 
         // Make snapshot if requested
