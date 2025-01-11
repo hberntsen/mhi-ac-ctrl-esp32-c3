@@ -25,8 +25,12 @@ using namespace mhi_ac::internal;
 
 gptimer_handle_t cs_timer = NULL;
 static TaskHandle_t mhi_poll_task_handle = NULL;
-//                              sb0   sb1   sb2   db0   db1   db2   db3   db4   db5   db6   db7   db8   db9  db10  db11  db12  db13 (db14  chkH  chkL not needed)
-static uint8_t miso_frame[] = { 0xA9, 0x00, 0x07, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x0f };
+//                              sb0                           sb1   sb2   db0   db1   db2   db3   db4   db5   db6   db7
+static uint8_t miso_frame[] = { USE_LONG_FRAME ? 0xAA : 0xA9, 0x00, 0x07, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0x00,
+//                              db8   db9   db10  db11  db12  db13  db14  chkH  chkL  db15  db16  db17  db18  db19  db20
+                                0x00, 0x00, 0xff, 0xff, 0xff, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//                              db21  db22  db23  db24  db25  db26 (chk2L not needed)
+                                0x00, 0x00, 0xff, 0xff, 0xff, 0xff };
 static SemaphoreHandle_t miso_semaphore_handle;
 static StaticSemaphore_t miso_semaphore_buffer;
 
@@ -394,14 +398,19 @@ static void mhi_poll_task(void *arg)
             // DB14 bit2 toggles periodically (about every 20 frames)
             sendbuf[DB14] = halfcycle << 2;
 
-            // calculate checksum
+            // calculate checksum for the short frame
             tx_checksum = 0;
             for (uint8_t byte_cnt = 0; byte_cnt < CBH; byte_cnt++) {
                 tx_checksum += sendbuf[byte_cnt];
             }
-
             sendbuf[CBH] = tx_checksum>>8;
             sendbuf[CBL] = tx_checksum;
+
+            // Continue calculating for the long frame
+            for (uint8_t byte_cnt = CBH; byte_cnt < CBL2; byte_cnt++) {
+              tx_checksum += sendbuf[byte_cnt];
+            }
+            sendbuf[CBL2] = tx_checksum;
         }
 
 

@@ -9,6 +9,7 @@
 
 #define MHI_FRAME_LEN_SHORT         20
 #define MHI_FRAME_LEN_LONG          33
+#define USE_LONG_FRAME              true
 
 // constants for the frame
 #define MODE_MASK                   0x1C    // auto=0 in homekit        //DB0
