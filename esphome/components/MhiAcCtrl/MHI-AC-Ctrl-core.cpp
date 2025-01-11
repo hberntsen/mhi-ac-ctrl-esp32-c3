@@ -262,7 +262,7 @@ void mhi_ac_ctrl_core_vanes_updown_set(ACVanes new_state) {
 
 static void mhi_poll_task(void *arg)
 {
-    esp_err_t err;
+    esp_err_t err = 0;
 
     uint16_t packet_cnt = 0;            // can be removed when diagnostic lines are removed
 
@@ -296,6 +296,14 @@ static void mhi_poll_task(void *arg)
     spi_slave_trans.rx_buffer = recvbuf;
 
     while(1) {
+        if (err) {
+            ESP_LOGW(TAG, "length: %i, trans len: %i",spi_slave_trans.length, spi_slave_trans.trans_len);
+            frame_errors++;
+
+            // wait a second before retrying communication
+            vTaskDelayMs(1000);
+        }
+        err = 0;
         frame_diff = false;
         packet_cnt++;
 
@@ -349,12 +357,12 @@ static void mhi_poll_task(void *arg)
 
         // blocking function waiting for the spi results. the hardware timer must reach 20ms and perform an spi transaction
         //  we can get the data directly from 'spi_slave_trans' instead of 'spi_slave_trans_out->'
-        ready= true;
-        //ESP_LOGI(TAG, "waiting for trans semaphore");
+        ready = true;
         err = spi_slave_get_trans_result(RCV_HOST, &spi_slave_trans_out, portMAX_DELAY);
-        ready= false;
+        ready = false;
         if(err) {
             ESP_LOGE(TAG, "get_trans_result error: %i", err);
+            continue;
         }
 
         rx_checksum = 0;
@@ -371,7 +379,6 @@ static void mhi_poll_task(void *arg)
             }
         }
 
-        bool frame_error = false;
 
         // check for errors. first byte should be 0x6c
         if ( ((mosi_frame[SB0] & 0xfe) != 0x6c) | (mosi_frame[SB1] != 0x80) | (mosi_frame[SB2] != 0x04) ) {
@@ -379,28 +386,22 @@ static void mhi_poll_task(void *arg)
                         packet_cnt, mosi_frame[0], mosi_frame[1], mosi_frame[2]);
 
 
-            frame_error = true;
+            err = true;
+            continue;
         } else if ( (mosi_frame[CBH] != (rx_checksum>>8 & 0xff)) | (mosi_frame[CBL] != (rx_checksum & 0xff)) ) {
             ESP_LOGW(TAG, "packet: %5d wrong MOSI checksum. calculated 0x%04x. MOSI[18]:0x%02x MOSI[19]:0x%02x",
                         packet_cnt, rx_checksum, mosi_frame[18], mosi_frame[19]);
 
-            frame_error = true;
+            err = true;
+            continue;
         }
 
-        if (frame_error) {
-            ESP_LOGW(TAG, "length: %i, trans len: %i",spi_slave_trans.length, spi_slave_trans.trans_len);
-            frame_errors++;
-
-            // wait a second before retrying communication
-            vTaskDelayMs(1000);
-        } else {
-            // Make snapshot if requested
-            if(xSemaphoreTake(snapshot_semaphore_handle, 0) != pdTRUE) {
-                memcpy(mosi_frame_snapshot_prev, mosi_frame_snapshot, sizeof(mosi_frame_snapshot_prev));
-                memcpy(mosi_frame_snapshot, recvbuf, sizeof(mosi_frame_snapshot));
-            }
-            xSemaphoreGive(snapshot_semaphore_handle);
+        // Make snapshot if requested
+        if(xSemaphoreTake(snapshot_semaphore_handle, 0) != pdTRUE) {
+            memcpy(mosi_frame_snapshot_prev, mosi_frame_snapshot, sizeof(mosi_frame_snapshot_prev));
+            memcpy(mosi_frame_snapshot, recvbuf, sizeof(mosi_frame_snapshot));
         }
+        xSemaphoreGive(snapshot_semaphore_handle);
 
 
 
@@ -437,7 +438,7 @@ static void mhi_poll_task(void *arg)
 
 
         // only need to perform updates if there was a change (with no error) since last frame read
-        if (frame_diff && !frame_error) {
+        if (frame_diff) {
             // Evaluate Operating Data and Error Operating Data
             bool MOSI_type_opdata = (mosi_frame[DB10] & 0x30) == 0x10;
 
