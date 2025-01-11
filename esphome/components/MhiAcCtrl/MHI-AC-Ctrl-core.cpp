@@ -364,6 +364,10 @@ static void mhi_poll_task(void *arg)
             ESP_LOGE(TAG, "get_trans_result error: %i", err);
             continue;
         }
+        if(spi_slave_trans_out->trans_len != MHI_FRAME_LEN * 8) {
+          err = true;
+          continue;
+        }
 
         rx_checksum = 0;
         for (uint8_t byte_cnt = 0; byte_cnt < MHI_FRAME_LEN; byte_cnt++) {
