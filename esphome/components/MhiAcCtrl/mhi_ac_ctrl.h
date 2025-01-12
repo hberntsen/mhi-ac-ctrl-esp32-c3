@@ -164,6 +164,72 @@ public:
     }
   }
 };
+class MhiVanesLR : public select::Select {
+public:
+  // Select options must match the ones in the select.py Python code
+  virtual void control(const std::string &value) {
+    if(value == "3D Auto") {
+      mhi_ac_ctrl_core_three_d_auto_set(true);
+    } else {
+      mhi_ac_ctrl_core_three_d_auto_set(false);
+      if(value == "Left") {
+        mhi_ac_ctrl_core_vanes_leftright_set(ACVanesLR::Left);
+      } else if(value == "Left/Center") {
+        mhi_ac_ctrl_core_vanes_leftright_set(ACVanesLR::LeftCenter);
+      } else if(value == "Center") {
+        mhi_ac_ctrl_core_vanes_leftright_set(ACVanesLR::Center);
+      } else if(value == "Center/Right") {
+        mhi_ac_ctrl_core_vanes_leftright_set(ACVanesLR::CenterRight);
+      } else if(value == "Right") {
+        mhi_ac_ctrl_core_vanes_leftright_set(ACVanesLR::Right);
+      } else if(value == "Wide") {
+        mhi_ac_ctrl_core_vanes_leftright_set(ACVanesLR::Wide);
+      } else if(value == "Spot") {
+        mhi_ac_ctrl_core_vanes_leftright_set(ACVanesLR::Spot);
+      } else if(value == "Swing") {
+        mhi_ac_ctrl_core_vanes_leftright_set(ACVanesLR::Swing);
+      } else {
+        ESP_LOGW(TAG, "Unknown vanes_lr mode received: %s", value.c_str());
+      }
+    }
+  }
+
+  void loop() {
+    if(!mhi_ac_ctrl_core_three_d_auto_changed() && !mhi_ac_ctrl_core_vanes_leftright_changed() && has_state()) {
+      return;
+    }
+    if(mhi_ac_ctrl_core_three_d_auto_get()) {
+      publish_state("3D Auto");
+    } else {
+      switch (mhi_ac_ctrl_core_vanes_leftright_get()) {
+        case ACVanesLR::Left:
+          publish_state("Left");
+          break;
+        case ACVanesLR::LeftCenter:
+          publish_state("Left/Center");
+          break;
+        case ACVanesLR::Center:
+          publish_state("Center");
+          break;
+        case ACVanesLR::CenterRight:
+          publish_state("Center/Right");
+          break;
+        case ACVanesLR::Right:
+          publish_state("Right");
+          break;
+        case ACVanesLR::Wide:
+          publish_state("Wide");
+          break;
+        case ACVanesLR::Spot:
+          publish_state("Spot");
+          break;
+        case ACVanesLR::Swing:
+          publish_state("Swing");
+          break;
+      }
+    }
+  }
+};
 #endif
 
 class MhiAcCtrl : public climate::Climate,
@@ -211,6 +277,8 @@ public:
 #ifdef USE_SELECT
         if(vanes_ud_select_)
             vanes_ud_select_->loop();
+        if(vanes_lr_select_)
+            vanes_lr_select_->loop();
 #endif
         bool first_time = std::isnan(this->target_temperature);
 
@@ -424,6 +492,7 @@ protected:
 protected:
 #ifdef USE_SELECT
     MhiVanesUD *vanes_ud_select_;
+    MhiVanesLR *vanes_lr_select_;
 #endif
     MhiFrameErrors *frame_errors_sensor_;
     MhiTotalEnergy *total_energy_sensor_;
@@ -435,7 +504,12 @@ public:
     void set_vanes_ud_select(MhiVanesUD *select) {
         this->vanes_ud_select_ = select;
     }
+
+    void set_vanes_lr_select(MhiVanesLR *select) {
+        this->vanes_lr_select_ = select;
+    }
 #endif
+
     void set_frame_errors_sensor(MhiFrameErrors *sensor) {
         this->frame_errors_sensor_ = sensor;
     }

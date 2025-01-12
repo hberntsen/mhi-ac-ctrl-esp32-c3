@@ -44,6 +44,9 @@ select:
     vanes_ud:
       name: ${device_name} Vanes Up Down
       id: ${device_id}_vanes_ud
+    vanes_lr:
+      name: ${device_name} Vanes Left Right
+      id: ${device_id}_vanes_lr
 
 sensor:
   - platform: MhiAcCtrl

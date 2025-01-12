@@ -79,6 +79,11 @@ enum class ACVanesUD {  // Vanes enum
    Up = 0, UpCenter = 1, CenterDown = 2, Down = 3, Swing = 4, SeeIRRemote = 255
 };
 
+enum class ACVanesLR {
+  Left = 0, LeftCenter = 1, Center = 2, CenterRight = 3, Right = 4, Wide = 5, Spot = 6, Swing = 8
+};
+
+
 //class CallbackInterface_Status {
    //public: virtual void cbiStatusFunction(ACStatus status, int value) = 0;
 //};
@@ -117,6 +122,10 @@ bool mhi_ac_ctrl_core_heatcool_get();
 bool mhi_ac_ctrl_core_vanes_updown_changed();
 ACVanesUD mhi_ac_ctrl_core_vanes_updown_get();
 void mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD new_state);
+
+bool mhi_ac_ctrl_core_vanes_leftright_changed();
+ACVanesLR mhi_ac_ctrl_core_vanes_leftright_get();
+void mhi_ac_ctrl_core_vanes_leftright_set(ACVanesLR new_state);
 
 bool mhi_ac_ctrl_core_three_d_auto_changed();
 bool mhi_ac_ctrl_core_three_d_auto_get();

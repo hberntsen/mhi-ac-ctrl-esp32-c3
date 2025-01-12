@@ -263,6 +263,35 @@ void mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD new_state) {
     xSemaphoreGive(miso_semaphore_handle);
 }
 
+bool mhi_ac_ctrl_core_vanes_leftright_changed() {
+  return (mosi_frame_snapshot[DB16] & 0x07) != (mosi_frame_snapshot_prev[DB16] & 0x07) ||
+    (mosi_frame_snapshot[DB17] & 0x01) != (mosi_frame_snapshot[DB17] & 0x01);
+}
+
+ACVanesLR mhi_ac_ctrl_core_vanes_leftright_get() {
+  if(mosi_frame_snapshot[DB17] & 0x01) {
+    return ACVanesLR::Swing;
+  }
+  return static_cast<ACVanesLR>(mosi_frame_snapshot[DB16] & 0x07);
+}
+
+void mhi_ac_ctrl_core_vanes_leftright_set(ACVanesLR new_state) {
+  xSemaphoreTake(miso_semaphore_handle, portMAX_DELAY);
+  miso_frame[DB17] |= 0b00000010; // swing set
+
+  if(new_state == ACVanesLR::Swing) {
+    miso_frame[DB17] |= 1;
+  } else {
+    miso_frame[DB17] &= ~1; // Disable swing
+
+    miso_frame[DB16] |= 0b00010000; // LR set
+    miso_frame[DB16] &= ~0b00000111; // Unset previously set direction
+    miso_frame[DB16] |= static_cast<uint8_t>(new_state) & 0x07; // Set direction
+  }
+
+  xSemaphoreGive(miso_semaphore_handle);
+}
+
 bool mhi_ac_ctrl_core_three_d_auto_changed() {
   return (mosi_frame_snapshot[DB17] & 0x04) != (mosi_frame_snapshot_prev[DB17] & 0x04);
 }
@@ -411,6 +440,7 @@ static void mhi_poll_task(void *arg)
                 miso_frame[DB0] = 0x00;
                 miso_frame[DB1] = 0x00;
                 miso_frame[DB2] = 0x00;
+                miso_frame[DB16] = 0x00;
                 miso_frame[DB17] = 0x00;
                 xSemaphoreGive(miso_semaphore_handle);
             }
