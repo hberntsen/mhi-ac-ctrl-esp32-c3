@@ -18,9 +18,9 @@ esp32:
   framework:
     type: esp-idf
 
-# Enable logging
+# Optionally enable logging
 logger:
-  level: DEBUG
+  level: INFO
 
 MhiAcCtrl:
   id: ${mhi_device_id}
