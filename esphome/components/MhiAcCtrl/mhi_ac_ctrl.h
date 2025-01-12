@@ -116,15 +116,15 @@ public:
 
     virtual void control(const std::string &value) {
         if(value == "Swing") {
-            mhi_ac_ctrl_core_vanes_updown_set(ACVanes::Swing);
+            mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD::Swing);
         } else if(value == "Up") {
-            mhi_ac_ctrl_core_vanes_updown_set(ACVanes::Up);
+            mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD::Up);
         } else if(value == "Up/Center") {
-            mhi_ac_ctrl_core_vanes_updown_set(ACVanes::UpCenter);
+            mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD::UpCenter);
         } else if(value == "Center/Down") {
-            mhi_ac_ctrl_core_vanes_updown_set(ACVanes::CenterDown);
+            mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD::CenterDown);
         } else if(value == "Down") {
-            mhi_ac_ctrl_core_vanes_updown_set(ACVanes::Down);
+            mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD::Down);
         } else {
             ESP_LOGW(TAG, "Unknown vanes_ud mode received: %s", value.c_str());
         }
@@ -133,22 +133,22 @@ public:
     void loop() {
         if(mhi_ac_ctrl_core_vanes_updown_changed() || !has_state()) {
             switch (mhi_ac_ctrl_core_vanes_updown_get()) {
-                case ACVanes::Swing:
+                case ACVanesUD::Swing:
                     publish_state("Swing");
                     break;
-                case ACVanes::Up:
+                case ACVanesUD::Up:
                     publish_state("Up");
                     break;
-                case ACVanes::UpCenter:
+                case ACVanesUD::UpCenter:
                     publish_state("Up/Center");
                     break;
-                case ACVanes::CenterDown:
+                case ACVanesUD::CenterDown:
                     publish_state("Center/Down");
                     break;
-                case ACVanes::Down:
+                case ACVanesUD::Down:
                     publish_state("Down");
                     break;
-                case ACVanes::SeeIRRemote:
+                case ACVanesUD::SeeIRRemote:
                     publish_state("See IR Remote");
                     break;
             }

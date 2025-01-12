@@ -75,7 +75,7 @@ enum class ACFan {
    unknown = 0xff,
 };
 
-enum class ACVanes {  // Vanes enum
+enum class ACVanesUD {  // Vanes enum
    Up = 0, UpCenter = 1, CenterDown = 2, Down = 3, Swing = 4, SeeIRRemote = 255
 };
 
@@ -115,8 +115,8 @@ bool mhi_ac_ctrl_core_heatcool_changed();
 bool mhi_ac_ctrl_core_heatcool_get();
 
 bool mhi_ac_ctrl_core_vanes_updown_changed();
-ACVanes mhi_ac_ctrl_core_vanes_updown_get();
-void mhi_ac_ctrl_core_vanes_updown_set(ACVanes new_state);
+ACVanesUD mhi_ac_ctrl_core_vanes_updown_get();
+void mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD new_state);
 
 uint32_t mhi_ac_ctrl_core_frame_errors_get();
 
