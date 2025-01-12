@@ -118,6 +118,10 @@ bool mhi_ac_ctrl_core_vanes_updown_changed();
 ACVanesUD mhi_ac_ctrl_core_vanes_updown_get();
 void mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD new_state);
 
+bool mhi_ac_ctrl_core_three_d_auto_changed();
+bool mhi_ac_ctrl_core_three_d_auto_get();
+void mhi_ac_ctrl_core_three_d_auto_set(bool new_state);
+
 uint32_t mhi_ac_ctrl_core_frame_errors_get();
 
 class MHIEnergy {

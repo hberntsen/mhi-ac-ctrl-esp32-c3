@@ -112,48 +112,57 @@ protected:
 #ifdef USE_SELECT
 class MhiVanesUD : public select::Select {
 public:
-    // Select options must match the ones in the select.py Python code
-
-    virtual void control(const std::string &value) {
-        if(value == "Swing") {
-            mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD::Swing);
-        } else if(value == "Up") {
-            mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD::Up);
-        } else if(value == "Up/Center") {
-            mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD::UpCenter);
-        } else if(value == "Center/Down") {
-            mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD::CenterDown);
-        } else if(value == "Down") {
-            mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD::Down);
-        } else {
-            ESP_LOGW(TAG, "Unknown vanes_ud mode received: %s", value.c_str());
-        }
+  // Select options must match the ones in the select.py Python code
+  virtual void control(const std::string &value) {
+    if(value == "3D Auto") {
+      mhi_ac_ctrl_core_three_d_auto_set(true);
+    } else {
+      mhi_ac_ctrl_core_three_d_auto_set(false);
+      if(value == "Swing") {
+        mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD::Swing);
+      } else if(value == "Up") {
+        mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD::Up);
+      } else if(value == "Up/Center") {
+        mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD::UpCenter);
+      } else if(value == "Center/Down") {
+        mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD::CenterDown);
+      } else if(value == "Down") {
+        mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD::Down);
+      } else {
+        ESP_LOGW(TAG, "Unknown vanes_ud mode received: %s", value.c_str());
+      }
     }
+  }
 
-    void loop() {
-        if(mhi_ac_ctrl_core_vanes_updown_changed() || !has_state()) {
-            switch (mhi_ac_ctrl_core_vanes_updown_get()) {
-                case ACVanesUD::Swing:
-                    publish_state("Swing");
-                    break;
-                case ACVanesUD::Up:
-                    publish_state("Up");
-                    break;
-                case ACVanesUD::UpCenter:
-                    publish_state("Up/Center");
-                    break;
-                case ACVanesUD::CenterDown:
-                    publish_state("Center/Down");
-                    break;
-                case ACVanesUD::Down:
-                    publish_state("Down");
-                    break;
-                case ACVanesUD::SeeIRRemote:
-                    publish_state("See IR Remote");
-                    break;
-            }
-        }
+  void loop() {
+    if(!mhi_ac_ctrl_core_three_d_auto_changed() && !mhi_ac_ctrl_core_vanes_updown_changed() && has_state()) {
+      return;
     }
+    if(mhi_ac_ctrl_core_three_d_auto_get()) {
+      publish_state("3D Auto");
+    } else {
+      switch (mhi_ac_ctrl_core_vanes_updown_get()) {
+        case ACVanesUD::Swing:
+          publish_state("Swing");
+          break;
+        case ACVanesUD::Up:
+          publish_state("Up");
+          break;
+        case ACVanesUD::UpCenter:
+          publish_state("Up/Center");
+          break;
+        case ACVanesUD::CenterDown:
+          publish_state("Center/Down");
+          break;
+        case ACVanesUD::Down:
+          publish_state("Down");
+          break;
+        case ACVanesUD::SeeIRRemote:
+          publish_state("See IR Remote");
+          break;
+      }
+    }
+  }
 };
 #endif
 

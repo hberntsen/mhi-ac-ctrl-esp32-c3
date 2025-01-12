@@ -263,6 +263,25 @@ void mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD new_state) {
     xSemaphoreGive(miso_semaphore_handle);
 }
 
+bool mhi_ac_ctrl_core_three_d_auto_changed() {
+  return (mosi_frame_snapshot[DB17] & 0x04) != (mosi_frame_snapshot_prev[DB17] & 0x04);
+}
+
+bool mhi_ac_ctrl_core_three_d_auto_get() {
+  return mosi_frame_snapshot[DB17] & 0x04;
+}
+
+void mhi_ac_ctrl_core_three_d_auto_set(bool new_state) {
+    xSemaphoreTake(miso_semaphore_handle, portMAX_DELAY);
+    miso_frame[DB17] |= 0b00001000; // 3dauto set
+    if(new_state) {
+      miso_frame[DB17] |= 0b00000100;
+    } else {
+      miso_frame[DB17] &= ~0b00000100;
+    }
+    xSemaphoreGive(miso_semaphore_handle);
+}
+
 static int validate_frame_short(uint8_t* mosi_frame, uint16_t rx_checksum) {
   if ( ((mosi_frame[SB0] & 0xfe) != 0x6c) | (mosi_frame[SB1] != 0x80) | (mosi_frame[SB2] != 0x04) ) {
     ESP_LOGW(TAG, "wrong MOSI signature. 0x%02x 0x%02x 0x%02x",
@@ -392,6 +411,7 @@ static void mhi_poll_task(void *arg)
                 miso_frame[DB0] = 0x00;
                 miso_frame[DB1] = 0x00;
                 miso_frame[DB2] = 0x00;
+                miso_frame[DB17] = 0x00;
                 xSemaphoreGive(miso_semaphore_handle);
             }
 

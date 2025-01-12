@@ -32,7 +32,8 @@ async def setup_conf(config, key, hub):
         conf = config[key]
         # The code depends on the exact values specified here, so change it in
         # both places.
-        sens = await select.new_select(conf, options=["Up", "Up/Center",
+        sens = await select.new_select(conf, options=["3D Auto", "Up",
+                                                      "Up/Center",
                                                       "Center/Down", "Down",
                                                       "Swing", "See IR Remote"])
         cg.add(getattr(hub, f"set_{key}_select")(sens))
