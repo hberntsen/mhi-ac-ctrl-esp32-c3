@@ -40,8 +40,8 @@ static gpio_num_t gpio_cs_out;
 
 static SemaphoreHandle_t snapshot_semaphore_handle;
 static StaticSemaphore_t snapshot_semaphore_buffer;
-static uint8_t mosi_frame_snapshot[DB14];
-static uint8_t mosi_frame_snapshot_prev[DB14];
+static uint8_t mosi_frame_snapshot[DB26];
+static uint8_t mosi_frame_snapshot_prev[DB26];
 static uint32_t frame_errors = 0;
 
 namespace mhi_ac {
