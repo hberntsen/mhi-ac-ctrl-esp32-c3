@@ -37,13 +37,6 @@ public:
 class MhiTotalEnergy : public Sensor {
 public:
     MhiTotalEnergy() {
-        this->total_energy_ = 0;
-#if STORE_POWER_IN_PREFERENCES
-        this->pref_ = global_preferences->make_preference<uint64_t>(this->get_object_id_hash());
-        this->pref_.load(&this->total_energy_);
-#endif
-        mhi_energy.add_energy(this->total_energy_);
-
         this->total_energy_ = mhi_energy.total_energy.load();
         publish_total();
     }
@@ -58,16 +51,10 @@ public:
 
     void publish_total() {
         this->publish_state(total_energy_ * (14.0f/(51000000.0f*3600)));
-#if STORE_POWER_IN_PREFERENCES
-        pref_.save(&total_energy_);
-#endif
     }
 
 protected:
     uint64_t total_energy_;
-#if STORE_POWER_IN_PREFERENCES
-    ESPPreferenceObject pref_;
-#endif
 };
 
 class MhiPower : public Sensor {
