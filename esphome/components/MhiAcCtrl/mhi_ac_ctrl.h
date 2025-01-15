@@ -252,8 +252,10 @@ public:
         bool publish_self_state = false;
         if(!mhi_ac_ctrl_core_snapshot(100)) {
             ESP_LOGW(TAG, "Snapshot timeout");
+            this->status_set_warning("No MHI AC communication");
             return;
         }
+        this->status_clear_warning();
 
         if(total_energy_sensor_)
             total_energy_sensor_->loop();
