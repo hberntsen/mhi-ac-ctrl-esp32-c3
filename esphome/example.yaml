@@ -24,8 +24,9 @@ logger:
 
 MhiAcCtrl:
   id: ${mhi_device_id}
-  # Optional PIN config
+  # Optional config
   # The default values are:
+  use_long_frame: true
   mosi_pin: GPIO7
   miso_pin: GPIO2
   sclk_pin: GPIO6
@@ -44,6 +45,7 @@ select:
     vanes_ud:
       name: ${device_name} Vanes Up Down
       id: ${device_id}_vanes_ud
+    # The 3D auto setting and vanes_lr only work when use_long_frame is set to true
     vanes_lr:
       name: ${device_name} Vanes Left Right
       id: ${device_id}_vanes_lr

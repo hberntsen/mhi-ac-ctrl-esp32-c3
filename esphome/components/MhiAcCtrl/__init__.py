@@ -13,6 +13,7 @@ mhi_core_ns = cg.global_ns.namespace("mhi_ac")
 ConfigStruct = mhi_core_ns.struct("Config")
 MhiAcCtrl = cg.global_ns.class_("MhiAcCtrl", cg.Component, climate.Climate)
 
+CONF_USE_LONG_FRAME = "use_long_frame"
 CONF_MOSI_PIN = "mosi_pin"
 CONF_MISO_PIN = "miso_pin"
 CONF_SCLK_PIN = "sclk_pin"
@@ -20,6 +21,7 @@ CONF_CS_IN_PIN = "cs_in_pin"
 CONF_CS_OUT_PIN = "cs_out_pin"
 
 TYPES = [
+    CONF_USE_LONG_FRAME,
     CONF_MOSI_PIN,
     CONF_MISO_PIN,
     CONF_SCLK_PIN,
@@ -30,6 +32,7 @@ TYPES = [
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(MhiAcCtrl),
+        cv.Optional(CONF_USE_LONG_FRAME, default=True): cv.boolean,
         cv.Optional(CONF_MOSI_PIN, default="GPIO7"): pins.gpio_input_pin_schema,
         cv.Optional(CONF_MISO_PIN, default="GPIO2"): pins.gpio_output_pin_schema,
         cv.Optional(CONF_SCLK_PIN, default="GPIO6"): pins.gpio_input_pin_schema,
@@ -41,6 +44,7 @@ CONFIG_SCHEMA = cv.Schema(
 async def to_code(config):
     config_struct = cg.StructInitializer(
         ConfigStruct,
+        ("use_long_frame", config[CONF_USE_LONG_FRAME]),
         ("mosi_pin", (await cg.gpio_pin_expression(config[CONF_MOSI_PIN])).get_pin()),
         ("miso_pin", (await cg.gpio_pin_expression(config[CONF_MISO_PIN])).get_pin()),
         ("sclk_pin", (await cg.gpio_pin_expression(config[CONF_SCLK_PIN])).get_pin()),

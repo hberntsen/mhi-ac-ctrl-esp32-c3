@@ -72,6 +72,12 @@ bool SpiState::update_snapshot(uint32_t wait_time_ms) {
   return xSemaphoreTake(this->snapshot_semaphore_handle_, pdMS_TO_TICKS(wait_time_ms));
 }
 
+void SpiState::use_long_frame(bool long_frame_enabled) {
+  xSemaphoreTake(this->miso_semaphore_handle_, portMAX_DELAY);
+  this->miso_frame_[SB0] = long_frame_enabled ? 0xAA : 0xA9;
+  xSemaphoreGive(this->miso_semaphore_handle_);
+}
+
 void active_mode_set(bool state) {
     active_mode = state;
     if(!active_mode) {
@@ -517,6 +523,7 @@ void init(const Config& config) {
     esp_err_t err;
 
     gpio_cs_out = static_cast<gpio_num_t>(config.cs_out_pin);
+    spi_state.use_long_frame(config.use_long_frame);
 
     // configuration for the SPI bus
     spi_bus_config_t buscfg = {

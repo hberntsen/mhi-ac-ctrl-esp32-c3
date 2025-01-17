@@ -13,7 +13,6 @@
 
 #define MHI_FRAME_LEN_SHORT         20
 #define MHI_FRAME_LEN_LONG          33
-#define USE_LONG_FRAME              true
 
 // constants for the frame
 #define MODE_MASK                   0x1C    // auto=0 in homekit        //DB0
@@ -134,17 +133,18 @@ uint32_t frame_errors_get();
 
 class SpiState {
 public:
-  //                        sb0                           sb1   sb2   db0   db1   db2   db3   db4   db5   db6   db7
-  SpiState():  miso_frame_{ USE_LONG_FRAME ? 0xAA : 0xA9, 0x00, 0x07, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0x00,
-  //                              db8   db9   db10  db11  db12  db13  db14  chkH  chkL  db15  db16  db17  db18  db19  db20
-                                  0x00, 0x00, 0xff, 0xff, 0xff, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  //                              db21  db22  db23  db24  db25  db26 (chk2L not needed)
-                                  0x00, 0x00, 0xff, 0xff, 0xff, 0xff } {
+//                           sb0   sb1   sb2   db0   db1   db2   db3   db4   db5   db6   db7   db8   db9   db10  db11  
+  SpiState():  miso_frame_{ 0xAA, 0x00, 0x07, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 
+//                          db12  db13  db14  chkH  chkL  db15  db16  db17  db18  db19  db20  db21  db22  db23  db24  
+                            0xff, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 
+//                          db25  db26 (chk2L not needed)
+                            0xff, 0xff } {
     miso_semaphore_handle_ = xSemaphoreCreateMutexStatic( &this->miso_semaphore_buffer_ );
     snapshot_semaphore_handle_ = xSemaphoreCreateBinaryStatic( &this->snapshot_semaphore_buffer_ );
   }
 
   bool update_snapshot(uint32_t wait_time_ms);
+  void use_long_frame(bool long_frame_enabled);
 
   bool target_temperature_changed() const;
   void target_temperature_set(float target_temperature);
