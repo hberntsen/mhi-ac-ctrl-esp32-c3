@@ -1,8 +1,12 @@
 #pragma once
 #include <stdint.h>
 #include <atomic>
+#include <array>
 #include "esp_timer.h"
 #include "driver/gpio.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
 
 // # Config
 #define RCV_HOST                    SPI2_HOST
@@ -43,7 +47,6 @@
 #endif
 
 namespace mhi_ac {
-
 struct Config {
   gpio_num_t mosi;
   gpio_num_t miso;
@@ -83,63 +86,118 @@ enum class ACVanesLR {
   Left = 0, LeftCenter = 1, Center = 2, CenterRight = 3, Right = 4, Wide = 5, Spot = 6, Swing = 8
 };
 
+namespace internal {
+  enum FrameIndices {
+    SB0 = 0,
+    SB1 = 1,
+    SB2 = 2,
+    DB0 = 3, ///< mode DB0[4:2]
+    DB1 = 4, ///< fan speed [1-3]
+    DB2 = 5, ///< set room temp DB2[6:0]. T[°C]=DB2[6:0]/2 The resolution is 0.50°C
+    DB3 = 6, ///< room temp DB3[7:0]. T[°C]=(DB3[7:0]-61)/4 The resolution is 0.25°C
+    DB6 = 9, ///< fan speed 4 DB6[6]
+    DB9 = 12,
+    DB10 = 13,
+    DB11 = 14,
+    DB12 = 15,
+    DB13 = 16, ///< compressor status. DB13[0] AC is on, DB13[1] AC is in heat mode, DB13[2]  compressor running/idle
+    DB14 = 17, ///< used on MISO toggle clock bit every 20 frames
+    CBH = 18,
+    CBL = 19,
+    DB15,
+    DB16,
+    DB17,
+    DB18,
+    DB19,
+    DB20,
+    DB21,
+    DB22,
+    DB23,
+    DB24,
+    DB25,
+    DB26,
+    CBL2,
+    FRAME_LEN = MHI_FRAME_LEN_LONG
+  };
+} // namespace internal
 
-//class CallbackInterface_Status {
-   //public: virtual void cbiStatusFunction(ACStatus status, int value) = 0;
-//};
 
-void mhi_ac_ctrl_core_init(const Config& config);
-bool mhi_ac_ctrl_core_snapshot(uint32_t wait_time_ms);
 
-void mhi_ac_ctrl_core_active_mode_set(bool state);
-bool mhi_ac_ctrl_core_active_mode_get();
+void init(const Config& config);
 
-bool mhi_ac_ctrl_core_target_temperature_changed();
-void mhi_ac_ctrl_core_target_temperature_set(float target_temperature);
-float mhi_ac_ctrl_core_target_temperature_get();
+void active_mode_set(bool state);
+bool active_mode_get();
 
-bool mhi_ac_ctrl_core_power_changed();
-void mhi_ac_ctrl_core_power_set(ACPower power);
-ACPower mhi_ac_ctrl_core_power_get();
 
-bool mhi_ac_ctrl_core_mode_changed();
-void mhi_ac_ctrl_core_mode_set(ACMode mode);
-ACMode mhi_ac_ctrl_core_mode_get();
+uint32_t frame_errors_get();
 
-bool mhi_ac_ctrl_core_fan_changed();
-void mhi_ac_ctrl_core_fan_set(ACFan fan);
-ACFan mhi_ac_ctrl_core_fan_get();
+class SpiState {
+public:
+  //                        sb0                           sb1   sb2   db0   db1   db2   db3   db4   db5   db6   db7
+  SpiState():  miso_frame_{ USE_LONG_FRAME ? 0xAA : 0xA9, 0x00, 0x07, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0x00,
+  //                              db8   db9   db10  db11  db12  db13  db14  chkH  chkL  db15  db16  db17  db18  db19  db20
+                                  0x00, 0x00, 0xff, 0xff, 0xff, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  //                              db21  db22  db23  db24  db25  db26 (chk2L not needed)
+                                  0x00, 0x00, 0xff, 0xff, 0xff, 0xff } {
+    miso_semaphore_handle_ = xSemaphoreCreateMutexStatic( &this->miso_semaphore_buffer_ );
+    snapshot_semaphore_handle_ = xSemaphoreCreateBinaryStatic( &this->snapshot_semaphore_buffer_ );
+  }
 
-bool mhi_ac_ctrl_core_current_temperature_changed();
-float mhi_ac_ctrl_core_current_temperature_get();
+  bool update_snapshot(uint32_t wait_time_ms);
 
-bool mhi_ac_ctrl_core_compressor_changed();
-bool mhi_ac_ctrl_core_compressor_get();
+  bool target_temperature_changed() const;
+  void target_temperature_set(float target_temperature);
+  float target_temperature_get() const;
 
-bool mhi_ac_ctrl_core_heatcool_changed();
-bool mhi_ac_ctrl_core_heatcool_get();
+  bool power_changed() const;
+  void power_set(ACPower power);
+  ACPower power_get() const;
 
-bool mhi_ac_ctrl_core_vanes_updown_changed();
-ACVanesUD mhi_ac_ctrl_core_vanes_updown_get();
-void mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD new_state);
+  bool mode_changed() const;
+  void mode_set(ACMode mode);
+  ACMode mode_get() const;
 
-bool mhi_ac_ctrl_core_vanes_leftright_changed();
-ACVanesLR mhi_ac_ctrl_core_vanes_leftright_get();
-void mhi_ac_ctrl_core_vanes_leftright_set(ACVanesLR new_state);
+  bool fan_changed() const;
+  void fan_set(ACFan fan);
+  ACFan fan_get() const;
 
-bool mhi_ac_ctrl_core_three_d_auto_changed();
-bool mhi_ac_ctrl_core_three_d_auto_get();
-void mhi_ac_ctrl_core_three_d_auto_set(bool new_state);
+  bool current_temperature_changed() const;
+  float current_temperature_get() const;
 
-uint32_t mhi_ac_ctrl_core_frame_errors_get();
+  bool compressor_changed() const;
+  bool compressor_get() const;
 
-class MHIEnergy {
+  bool heatcool_changed() const;
+  bool heatcool_get() const;
+
+  bool vanes_updown_changed() const;
+  ACVanesUD vanes_updown_get() const;
+  void vanes_updown_set(ACVanesUD new_state);
+
+  bool vanes_leftright_changed() const;
+  ACVanesLR vanes_leftright_get() const;
+  void vanes_leftright_set(ACVanesLR new_state);
+
+  bool three_d_auto_changed() const;
+  bool three_d_auto_get() const;
+  void three_d_auto_set(bool new_state);
+
+  std::array<uint8_t, internal::CBL2> miso_frame_;
+  std::array<uint8_t, internal::DB26> mosi_frame_snapshot_;
+  std::array<uint8_t, internal::DB26> mosi_frame_snapshot_prev_;
+  SemaphoreHandle_t miso_semaphore_handle_;
+  StaticSemaphore_t miso_semaphore_buffer_;
+  SemaphoreHandle_t snapshot_semaphore_handle_;
+  StaticSemaphore_t snapshot_semaphore_buffer_;
+};
+
+class Energy {
 public:
     // Multiply by 14/51 * 10^-6 / 3600 for Wh
     // Should survive at least 32 years with 5kW without rolling over
     std::atomic_uint_least64_t total_energy;
 
-    MHIEnergy(uint16_t new_voltage) {
+    Energy(uint16_t new_voltage) {
         last_update = 0;
         voltage = new_voltage;
         current = 0;
@@ -199,42 +257,7 @@ protected:
     uint8_t current;
 };
 
-extern MHIEnergy mhi_energy;
-
-namespace internal {
-    enum FrameIndices {
-        SB0 = 0,
-        SB1 = 1,
-        SB2 = 2,
-        DB0 = 3, ///< mode DB0[4:2]
-        DB1 = 4, ///< fan speed [1-3]
-        DB2 = 5, ///< set room temp DB2[6:0]. T[°C]=DB2[6:0]/2 The resolution is 0.50°C
-        DB3 = 6, ///< room temp DB3[7:0]. T[°C]=(DB3[7:0]-61)/4 The resolution is 0.25°C
-        DB6 = 9, ///< fan speed 4 DB6[6]
-        DB9 = 12,
-        DB10 = 13,
-        DB11 = 14,
-        DB12 = 15,
-        DB13 = 16, ///< compressor status. DB13[0] AC is on, DB13[1] AC is in heat mode, DB13[2]  compressor running/idle
-        DB14 = 17, ///< used on MISO toggle clock bit every 20 frames
-        CBH = 18,
-        CBL = 19,
-        DB15,
-        DB16,
-        DB17,
-        DB18,
-        DB19,
-        DB20,
-        DB21,
-        DB22,
-        DB23,
-        DB24,
-        DB25,
-        DB26,
-        CBL2,
-        FRAME_LEN = MHI_FRAME_LEN_LONG
-    };
-
-} // namespace internal
+extern Energy energy;
+extern SpiState spi_state;
 
 } // namespace mhi_ac

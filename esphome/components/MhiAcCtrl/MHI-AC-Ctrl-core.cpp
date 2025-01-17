@@ -3,10 +3,9 @@
 
 #include "MHI-AC-Ctrl-core.h"
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include <math.h>
 #include <string.h>
+#include <algorithm>
 
 #include "driver/gptimer.h"
 #include "driver/spi_slave.h"
@@ -25,27 +24,16 @@ using namespace mhi_ac::internal;
 
 gptimer_handle_t cs_timer = NULL;
 static TaskHandle_t mhi_poll_task_handle = NULL;
-//                              sb0                           sb1   sb2   db0   db1   db2   db3   db4   db5   db6   db7
-static uint8_t miso_frame[] = { USE_LONG_FRAME ? 0xAA : 0xA9, 0x00, 0x07, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0x00,
-//                              db8   db9   db10  db11  db12  db13  db14  chkH  chkL  db15  db16  db17  db18  db19  db20
-                                0x00, 0x00, 0xff, 0xff, 0xff, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-//                              db21  db22  db23  db24  db25  db26 (chk2L not needed)
-                                0x00, 0x00, 0xff, 0xff, 0xff, 0xff };
-static SemaphoreHandle_t miso_semaphore_handle;
-static StaticSemaphore_t miso_semaphore_buffer;
 
 static int ready = 0;
 static bool active_mode = false;
 static gpio_num_t gpio_cs_out;
 
-static SemaphoreHandle_t snapshot_semaphore_handle;
-static StaticSemaphore_t snapshot_semaphore_buffer;
-static uint8_t mosi_frame_snapshot[DB26];
-static uint8_t mosi_frame_snapshot_prev[DB26];
 static uint32_t frame_errors = 0;
 
 namespace mhi_ac {
-MHIEnergy mhi_energy(230);
+Energy energy(230);
+SpiState spi_state;
 
 
 static void IRAM_ATTR gpio_isr_handler(void* arg)
@@ -79,239 +67,237 @@ static bool IRAM_ATTR gptimer_isr_callback(gptimer_handle_t timer, const gptimer
     return false;
 }
 
-bool mhi_ac_ctrl_core_snapshot(uint32_t wait_time_ms) {
-    xSemaphoreTake(snapshot_semaphore_handle, 0);
-    return xSemaphoreTake(snapshot_semaphore_handle, pdMS_TO_TICKS(wait_time_ms));
+bool SpiState::update_snapshot(uint32_t wait_time_ms) {
+  xSemaphoreTake(this->snapshot_semaphore_handle_, 0);
+  return xSemaphoreTake(this->snapshot_semaphore_handle_, pdMS_TO_TICKS(wait_time_ms));
 }
 
-void mhi_ac_ctrl_core_active_mode_set(bool state) {
+void active_mode_set(bool state) {
     active_mode = state;
     if(!active_mode) {
         // Ensure we stop counting power when active mode is off
-        mhi_energy.set_current(0);
+        energy.set_current(0);
     }
 }
 
-bool mhi_ac_ctrl_core_active_mode_get() {
+bool active_mode_get() {
     return active_mode;
 }
 
 #define CLAMP(x, lower, upper) (MIN(upper, MAX(x, lower)))
 
-void mhi_ac_ctrl_core_target_temperature_set(float target_temperature) {
-    xSemaphoreTake(miso_semaphore_handle, portMAX_DELAY);
-    //uint8_t tsetpoint = (uint8_t)roundf(CLAMP(target_temperature*2, 18.f*2, 30.f*2));
-    uint8_t tsetpoint = (uint8_t)roundf(CLAMP(target_temperature*2, 0.f*2, 30.f*2));
-    miso_frame[DB2] = tsetpoint;
-    miso_frame[DB2] |= 1 << 7;      // set bit for temp
-    ESP_LOGD(TAG, "Set temperature, new DB2: %x (from source temp %f)", miso_frame[DB2], target_temperature);
-    xSemaphoreGive(miso_semaphore_handle);
+void SpiState::target_temperature_set(float target_temperature) {
+  xSemaphoreTake(this->miso_semaphore_handle_, portMAX_DELAY);
+  uint8_t tsetpoint = (uint8_t)roundf(CLAMP(target_temperature*2, 0.f*2, 30.f*2));
+  this->miso_frame_[DB2] = tsetpoint;
+  this->miso_frame_[DB2] |= 1 << 7;      // set bit for temp
+  ESP_LOGD(TAG, "Set temperature, new DB2: %x (from source temp %f)", this->miso_frame_[DB2], target_temperature);
+  xSemaphoreGive(this->miso_semaphore_handle_);
 }
 
-bool mhi_ac_ctrl_core_target_temperature_changed() {
-  return (mosi_frame_snapshot[DB2] &~ (1 << 7)) != (mosi_frame_snapshot_prev[DB2] &~ (1 << 7));
+bool SpiState::target_temperature_changed() const {
+  return (this->mosi_frame_snapshot_[DB2] &~ (1 << 7)) != (this->mosi_frame_snapshot_prev_[DB2] &~ (1 << 7));
 }
 
-float mhi_ac_ctrl_core_target_temperature_get() {
-    float temp = mosi_frame_snapshot[DB2] &~ (1 << 7);
-    return temp / 2.0f;
+float SpiState::target_temperature_get() const {
+  float temp = this->mosi_frame_snapshot_[DB2] &~ (1 << 7);
+  return temp / 2.0f;
 }
 
-bool mhi_ac_ctrl_core_power_changed() {
-    return (mosi_frame_snapshot[DB0] & PWR_MASK) != (mosi_frame_snapshot_prev[DB0] & PWR_MASK);
+bool SpiState::power_changed() const {
+  return (this->mosi_frame_snapshot_[DB0] & PWR_MASK) != (this->mosi_frame_snapshot_prev_[DB0] & PWR_MASK);
 }
 
-void mhi_ac_ctrl_core_power_set(ACPower power) {
-    xSemaphoreTake(miso_semaphore_handle, portMAX_DELAY);
-    miso_frame[DB0] &= ~PWR_MASK;                       // clear what is there first
-    miso_frame[DB0] |= (uint8_t)power;                  // set the setting
-    miso_frame[DB0] |= 1 << 1;                          // DB0[1] 'set setting bit'
-    xSemaphoreGive(miso_semaphore_handle);
+void SpiState::power_set(ACPower power) {
+  xSemaphoreTake(this->miso_semaphore_handle_, portMAX_DELAY);
+  this->miso_frame_[DB0] &= ~PWR_MASK;                       // clear what is there first
+  this->miso_frame_[DB0] |= (uint8_t)power;                  // set the setting
+  this->miso_frame_[DB0] |= 1 << 1;                          // DB0[1] 'set setting bit'
+  xSemaphoreGive(this->miso_semaphore_handle_);
 }
 
-ACPower mhi_ac_ctrl_core_power_get() {
-    if(mosi_frame_snapshot[DB0] & PWR_MASK)
-        return ACPower::power_on;
-    else
-        return ACPower::power_off;
+ACPower SpiState::power_get() const {
+  if(this->mosi_frame_snapshot_[DB0] & PWR_MASK)
+    return ACPower::power_on;
+  else
+    return ACPower::power_off;
 }
 
-bool mhi_ac_ctrl_core_mode_changed() {
-    return (mosi_frame_snapshot[DB0] & MODE_MASK) != (mosi_frame_snapshot_prev[DB0] & MODE_MASK);
+bool SpiState::mode_changed() const {
+  return (this->mosi_frame_snapshot_[DB0] & MODE_MASK) != (this->mosi_frame_snapshot_prev_[DB0] & MODE_MASK);
 }
 
-void mhi_ac_ctrl_core_mode_set(ACMode mode) {
-    if(mode == ACMode::mode_unknown) {
-        return;
-    }
-    xSemaphoreTake(miso_semaphore_handle, portMAX_DELAY);
-    miso_frame[DB0] &= ~MODE_MASK;                      // clear what is there first
-    miso_frame[DB0] |= (uint8_t)mode;                   // set the setting
-    miso_frame[DB0] |= 1 << 5;                          // 'set setting bit for mode'
-    xSemaphoreGive(miso_semaphore_handle);
+void SpiState::mode_set(ACMode mode) {
+  if(mode == ACMode::mode_unknown) {
+    return;
+  }
+  xSemaphoreTake(this->miso_semaphore_handle_, portMAX_DELAY);
+  this->miso_frame_[DB0] &= ~MODE_MASK;                      // clear what is there first
+  this->miso_frame_[DB0] |= (uint8_t)mode;                   // set the setting
+  this->miso_frame_[DB0] |= 1 << 5;                          // 'set setting bit for mode'
+  xSemaphoreGive(this->miso_semaphore_handle_);
 }
 
-ACMode mhi_ac_ctrl_core_mode_get() {
-    uint8_t current_mode = mosi_frame_snapshot[DB0] & MODE_MASK;
-    switch(current_mode) {
-        case (uint8_t)ACMode::mode_auto:
-        case (uint8_t)ACMode::mode_dry:
-        case (uint8_t)ACMode::mode_cool:
-        case (uint8_t)ACMode::mode_fan:
-        case (uint8_t)ACMode::mode_heat:
-            return (ACMode) current_mode;
-        default:
-            return ACMode::mode_unknown;
-    }
+ACMode SpiState::mode_get() const {
+  uint8_t current_mode = this->mosi_frame_snapshot_[DB0] & MODE_MASK;
+  switch(current_mode) {
+    case (uint8_t)ACMode::mode_auto:
+    case (uint8_t)ACMode::mode_dry:
+    case (uint8_t)ACMode::mode_cool:
+    case (uint8_t)ACMode::mode_fan:
+    case (uint8_t)ACMode::mode_heat:
+      return (ACMode) current_mode;
+    default:
+      return ACMode::mode_unknown;
+  }
 }
 
-bool mhi_ac_ctrl_core_fan_changed() {
-    return (mosi_frame_snapshot[DB1] & FAN_MASK) != (mosi_frame_snapshot_prev[DB1] & FAN_MASK);
-
+bool SpiState::fan_changed() const {
+  return (this->mosi_frame_snapshot_[DB1] & FAN_MASK) != (this->mosi_frame_snapshot_prev_[DB1] & FAN_MASK);
 }
-void mhi_ac_ctrl_core_fan_set(ACFan fan) {
-    xSemaphoreTake(miso_semaphore_handle, portMAX_DELAY);
-    miso_frame[DB1] &= ~FAN_MASK;
-    miso_frame[DB1] |= (uint8_t) fan;
-    miso_frame[DB1] |= 1 << 3;              // set bit for fan speed on DB1
-    xSemaphoreGive(miso_semaphore_handle);
-}
-
-ACFan mhi_ac_ctrl_core_fan_get() {
-    uint8_t fan_value = mosi_frame_snapshot[DB1] & FAN_MASK;
-    switch(fan_value) {
-        case (uint8_t) ACFan::speed_1:
-        case (uint8_t) ACFan::speed_2:
-        case (uint8_t) ACFan::speed_3:
-        case (uint8_t) ACFan::speed_4:
-        case (uint8_t) ACFan::speed_auto:
-            return (ACFan) fan_value;
-        default:
-            return ACFan::unknown;
-    }
+void SpiState::fan_set(ACFan fan) {
+  xSemaphoreTake(this->miso_semaphore_handle_, portMAX_DELAY);
+  this->miso_frame_[DB1] &= ~FAN_MASK;
+  this->miso_frame_[DB1] |= (uint8_t) fan;
+  this->miso_frame_[DB1] |= 1 << 3;              // set bit for fan speed on DB1
+  xSemaphoreGive(this->miso_semaphore_handle_);
 }
 
-bool mhi_ac_ctrl_core_current_temperature_changed() {
-    return mosi_frame_snapshot[DB3] != mosi_frame_snapshot_prev[DB3];
+ACFan SpiState::fan_get() const {
+  uint8_t fan_value = this->mosi_frame_snapshot_[DB1] & FAN_MASK;
+  switch(fan_value) {
+    case (uint8_t) ACFan::speed_1:
+    case (uint8_t) ACFan::speed_2:
+    case (uint8_t) ACFan::speed_3:
+    case (uint8_t) ACFan::speed_4:
+    case (uint8_t) ACFan::speed_auto:
+      return (ACFan) fan_value;
+    default:
+      return ACFan::unknown;
+  }
 }
 
-float mhi_ac_ctrl_core_current_temperature_get() {
-    return ((int)mosi_frame_snapshot[DB3] - 61) / 4.0;
+bool SpiState::current_temperature_changed() const {
+  return this->mosi_frame_snapshot_[DB3] != this->mosi_frame_snapshot_prev_[DB3];
 }
 
-bool mhi_ac_ctrl_core_compressor_changed() {
-    return (mosi_frame_snapshot[DB13] & COMP_ACTIVE_MASK) != (mosi_frame_snapshot_prev[DB13] & COMP_ACTIVE_MASK);
+float SpiState::current_temperature_get() const {
+  return ((int)this->mosi_frame_snapshot_[DB3] - 61) / 4.0;
 }
 
-bool mhi_ac_ctrl_core_compressor_get() {
-    return mosi_frame_snapshot[DB13] & COMP_ACTIVE_MASK;
+bool SpiState::compressor_changed() const{
+  return (this->mosi_frame_snapshot_[DB13] & COMP_ACTIVE_MASK) != (this->mosi_frame_snapshot_prev_[DB13] & COMP_ACTIVE_MASK);
 }
 
-bool mhi_ac_ctrl_core_heatcool_changed() {
-    return (mosi_frame_snapshot[DB13] & HEAT_COOL_MASK) != (mosi_frame_snapshot_prev[DB13] & HEAT_COOL_MASK);
+bool SpiState::compressor_get() const {
+  return this->mosi_frame_snapshot_[DB13] & COMP_ACTIVE_MASK;
 }
 
-bool mhi_ac_ctrl_core_heatcool_get() {
-    return mosi_frame_snapshot[DB13] & HEAT_COOL_MASK;
+bool SpiState::heatcool_changed() const {
+  return (this->mosi_frame_snapshot_[DB13] & HEAT_COOL_MASK) != (this->mosi_frame_snapshot_prev_[DB13] & HEAT_COOL_MASK);
 }
 
-uint32_t mhi_ac_ctrl_core_frame_errors_get() {
+bool SpiState::heatcool_get() const {
+  return this->mosi_frame_snapshot_[DB13] & HEAT_COOL_MASK;
+}
+
+uint32_t frame_errors_get() {
     return frame_errors;
 }
 
-bool mhi_ac_ctrl_core_vanes_updown_changed() {
-    return (mosi_frame_snapshot[DB0] & 0xC0) != (mosi_frame_snapshot_prev[DB0] & 0xC0) ||
-        (mosi_frame_snapshot[DB1] & 0x30) != (mosi_frame_snapshot_prev[DB1] & 0x30);
+bool SpiState::vanes_updown_changed() const {
+  return (this->mosi_frame_snapshot_[DB0] & 0xC0) != (this->mosi_frame_snapshot_prev_[DB0] & 0xC0) ||
+    (this->mosi_frame_snapshot_[DB1] & 0x30) != (this->mosi_frame_snapshot_prev_[DB1] & 0x30);
 }
 
-ACVanesUD mhi_ac_ctrl_core_vanes_updown_get() {
-    // Swing or up/down position was set using remote
-    // meaning we can't know the position
-    if((mosi_frame_snapshot[DB0] & 0x80) == 0 || (mosi_frame_snapshot[DB1] & 0x80) == 0) {
-        return ACVanesUD::SeeIRRemote;
-    }
+ACVanesUD SpiState::vanes_updown_get() const {
+  // Swing or up/down position was set using remote
+  // meaning we can't know the position
+  if((this->mosi_frame_snapshot_[DB0] & 0x80) == 0 || (this->mosi_frame_snapshot_[DB1] & 0x80) == 0) {
+    return ACVanesUD::SeeIRRemote;
+  }
 
-    if(mosi_frame_snapshot[DB0] & 0x40) {
-        return ACVanesUD::Swing;
-    }
-    switch (mosi_frame_snapshot[DB1] & 0x30) {
-        case 0x00:
-            return ACVanesUD::Up;
-        case 0x10:
-            return ACVanesUD::UpCenter;
-        case 0x20:
-            return ACVanesUD::CenterDown;
-        case 0x30:
-        default:
-            return ACVanesUD::Down;
-    }
+  if(this->mosi_frame_snapshot_[DB0] & 0x40) {
+    return ACVanesUD::Swing;
+  }
+  switch (this->mosi_frame_snapshot_[DB1] & 0x30) {
+    case 0x00:
+      return ACVanesUD::Up;
+    case 0x10:
+      return ACVanesUD::UpCenter;
+    case 0x20:
+      return ACVanesUD::CenterDown;
+    case 0x30:
+    default:
+      return ACVanesUD::Down;
+  }
 }
 
-void mhi_ac_ctrl_core_vanes_updown_set(ACVanesUD new_state) {
-    if(new_state == ACVanesUD::SeeIRRemote)
-        return;
-    xSemaphoreTake(miso_semaphore_handle, portMAX_DELAY);
+void SpiState::vanes_updown_set(ACVanesUD new_state) {
+  if(new_state == ACVanesUD::SeeIRRemote)
+    return;
+  xSemaphoreTake(this->miso_semaphore_handle_, portMAX_DELAY);
 
-    miso_frame[DB0] |= 0x80; // Vanes set
-    if(new_state == ACVanesUD::Swing) {
-        miso_frame[DB0] |= 0x40; // Enable swing
-    } else {
-        miso_frame[DB0] &= ~0x40;
-        miso_frame[DB1] |= 0x80; // Pos set
-        miso_frame[DB1] |= (static_cast<uint8_t>(new_state)) << 4;
-    }
-    xSemaphoreGive(miso_semaphore_handle);
+  this->miso_frame_[DB0] |= 0x80; // Vanes set
+  if(new_state == ACVanesUD::Swing) {
+      this->miso_frame_[DB0] |= 0x40; // Enable swing
+  } else {
+      this->miso_frame_[DB0] &= ~0x40;
+      this->miso_frame_[DB1] |= 0x80; // Pos set
+      this->miso_frame_[DB1] |= (static_cast<uint8_t>(new_state)) << 4;
+  }
+  xSemaphoreGive(miso_semaphore_handle_);
 }
 
-bool mhi_ac_ctrl_core_vanes_leftright_changed() {
-  return (mosi_frame_snapshot[DB16] & 0x07) != (mosi_frame_snapshot_prev[DB16] & 0x07) ||
-    (mosi_frame_snapshot[DB17] & 0x01) != (mosi_frame_snapshot[DB17] & 0x01);
+bool SpiState::vanes_leftright_changed() const {
+  return (this->mosi_frame_snapshot_[DB16] & 0x07) != (this->mosi_frame_snapshot_prev_[DB16] & 0x07) ||
+    (this->mosi_frame_snapshot_[DB17] & 0x01) != (this->mosi_frame_snapshot_[DB17] & 0x01);
 }
 
-ACVanesLR mhi_ac_ctrl_core_vanes_leftright_get() {
-  if(mosi_frame_snapshot[DB17] & 0x01) {
+ACVanesLR SpiState::vanes_leftright_get() const {
+  if(this->mosi_frame_snapshot_[DB17] & 0x01) {
     return ACVanesLR::Swing;
   }
-  return static_cast<ACVanesLR>(mosi_frame_snapshot[DB16] & 0x07);
+  return static_cast<ACVanesLR>(this->mosi_frame_snapshot_[DB16] & 0x07);
 }
 
-void mhi_ac_ctrl_core_vanes_leftright_set(ACVanesLR new_state) {
-  xSemaphoreTake(miso_semaphore_handle, portMAX_DELAY);
-  miso_frame[DB17] |= 0b00000010; // swing set
+void SpiState::vanes_leftright_set(ACVanesLR new_state) {
+  xSemaphoreTake(this->miso_semaphore_handle_, portMAX_DELAY);
+  this->miso_frame_[DB17] |= 0b00000010; // swing set
 
   if(new_state == ACVanesLR::Swing) {
-    miso_frame[DB17] |= 1;
+    this->miso_frame_[DB17] |= 1;
   } else {
-    miso_frame[DB17] &= ~1; // Disable swing
+    this->miso_frame_[DB17] &= ~1; // Disable swing
 
-    miso_frame[DB16] |= 0b00010000; // LR set
-    miso_frame[DB16] &= ~0b00000111; // Unset previously set direction
-    miso_frame[DB16] |= static_cast<uint8_t>(new_state) & 0x07; // Set direction
+    this->miso_frame_[DB16] |= 0b00010000; // LR set
+    this->miso_frame_[DB16] &= ~0b00000111; // Unset previously set direction
+    this->miso_frame_[DB16] |= static_cast<uint8_t>(new_state) & 0x07; // Set direction
   }
 
-  xSemaphoreGive(miso_semaphore_handle);
+  xSemaphoreGive(this->miso_semaphore_handle_);
 }
 
-bool mhi_ac_ctrl_core_three_d_auto_changed() {
-  return (mosi_frame_snapshot[DB17] & 0x04) != (mosi_frame_snapshot_prev[DB17] & 0x04);
+bool SpiState::three_d_auto_changed() const {
+  return (this->mosi_frame_snapshot_[DB17] & 0x04) != (this->mosi_frame_snapshot_prev_[DB17] & 0x04);
 }
 
-bool mhi_ac_ctrl_core_three_d_auto_get() {
-  return mosi_frame_snapshot[DB17] & 0x04;
+bool SpiState::three_d_auto_get() const {
+  return this->mosi_frame_snapshot_[DB17] & 0x04;
 }
 
-void mhi_ac_ctrl_core_three_d_auto_set(bool new_state) {
-    xSemaphoreTake(miso_semaphore_handle, portMAX_DELAY);
-    miso_frame[DB17] |= 0b00001000; // 3dauto set
-    if(new_state) {
-      miso_frame[DB17] |= 0b00000100;
-    } else {
-      miso_frame[DB17] &= ~0b00000100;
-    }
-    xSemaphoreGive(miso_semaphore_handle);
+void SpiState::three_d_auto_set(bool new_state) {
+  xSemaphoreTake(this->miso_semaphore_handle_, portMAX_DELAY);
+  this->miso_frame_[DB17] |= 0b00001000; // 3dauto set
+  if(new_state) {
+    this->miso_frame_[DB17] |= 0b00000100;
+  } else {
+    this->miso_frame_[DB17] &= ~0b00000100;
+  }
+  xSemaphoreGive(miso_semaphore_handle_);
 }
 
-static int validate_frame_short(uint8_t* mosi_frame, uint16_t rx_checksum) {
+static int validate_frame_short(std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame, uint16_t rx_checksum) {
   if ( ((mosi_frame[SB0] & 0xfe) != 0x6c) | (mosi_frame[SB1] != 0x80) | (mosi_frame[SB2] != 0x04) ) {
     ESP_LOGW(TAG, "wrong MOSI signature. 0x%02x 0x%02x 0x%02x",
                 mosi_frame[0], mosi_frame[1], mosi_frame[2]);
@@ -326,7 +312,7 @@ static int validate_frame_short(uint8_t* mosi_frame, uint16_t rx_checksum) {
   return 0;
 }
 
-static int validate_frame_long(uint8_t* mosi_frame, uint8_t rx_checksum) {
+static int validate_frame_long(std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame, uint8_t rx_checksum) {
   if(mosi_frame[CBL2] != rx_checksum) {
     ESP_LOGW(TAG, "wrong long MOSI checksum. calculated 0x%02x. MOSI[32]:0x%02x",
                 rx_checksum, mosi_frame[CBL2]);
@@ -335,7 +321,7 @@ static int validate_frame_long(uint8_t* mosi_frame, uint8_t rx_checksum) {
   return 0;
 }
 
-static int validate_frame(uint8_t* mosi_frame, uint8_t frame_len) {
+static int validate_frame(std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame, uint8_t frame_len) {
   int err = 0;;
   uint16_t rx_checksum = 0;
   // Frame len has been validated before to only be either MHI_FRAME_LEN_LONG or MHI_FRAME_LEN_SHORT
@@ -377,11 +363,11 @@ static void mhi_poll_task(void *arg)
 
     // use WORD_ALIGNED_ATTR when using DMA buffer
     // use 2 recv buffers to be able to check for differences
-    WORD_ALIGNED_ATTR uint8_t sendbuf[MHI_FRAME_LEN_LONG];
-    WORD_ALIGNED_ATTR uint8_t recvbuf[MHI_FRAME_LEN_LONG];
-    WORD_ALIGNED_ATTR uint8_t recvbuf2[MHI_FRAME_LEN_LONG];
-    uint8_t* mosi_frame_prev = recvbuf2;
-    uint8_t* mosi_frame = recvbuf;
+    WORD_ALIGNED_ATTR std::array<uint8_t, MHI_FRAME_LEN_LONG> sendbuf;
+    WORD_ALIGNED_ATTR std::array<uint8_t, MHI_FRAME_LEN_LONG> recvbuf;
+    WORD_ALIGNED_ATTR std::array<uint8_t, MHI_FRAME_LEN_LONG> recvbuf2;
+    std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame_prev = recvbuf2;
+    std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame = recvbuf;
 
     spi_slave_transaction_t spi_slave_trans;
     spi_slave_transaction_t* spi_slave_trans_out;       // needed for spi_slave_get_trans_result which needs a pointer to a pointer
@@ -396,8 +382,8 @@ static void mhi_poll_task(void *arg)
 
     //Set up a transaction of MHI_FRAME_LEN bytes to send/receive
     spi_slave_trans.length = MHI_FRAME_LEN_LONG*8;
-    spi_slave_trans.tx_buffer = sendbuf;
-    spi_slave_trans.rx_buffer = mosi_frame;
+    spi_slave_trans.tx_buffer = &sendbuf;
+    spi_slave_trans.rx_buffer = &mosi_frame;
 
     while(1) {
         if (err) {
@@ -410,14 +396,14 @@ static void mhi_poll_task(void *arg)
         err = 0;
 
         if(!active_mode) {
-            memset(sendbuf, 0xff, sizeof sendbuf);
+          std::fill(sendbuf.begin(), sendbuf.end(), 0xff);
         } else if (frame++ >= MHI_NUM_FRAMES_PER_INTERVAL) {
             halfcycle = !halfcycle;                     // toggle
             frame = 1;                                  // 2 * MHI_NUM_FRAMES_PER_INTERVAL make a complete cycle. for half that,
             // MISO_frame[DB14] bit2 is 0, and the other half it is 1. When it is set to 1
             // the MISO can be set with any new settings
-            if (halfcycle && xSemaphoreTake(miso_semaphore_handle, 0) == pdTRUE) {
-                memcpy(sendbuf, miso_frame, sizeof(miso_frame));
+            if (halfcycle && xSemaphoreTake(spi_state.miso_semaphore_handle_, 0) == pdTRUE) {
+                std::copy(spi_state.miso_frame_.begin(), spi_state.miso_frame_.end(), sendbuf.begin());
                 //request current
                 sendbuf[DB6] = 0x40;
                 sendbuf[DB9] = 0x90; //current
@@ -437,12 +423,12 @@ static void mhi_poll_task(void *arg)
                 // MHI_NUM_FRAMES_PER_INTERVAL), the MISO frame is set (in
                 // this loop) with any settings that have changed in the ESP
 
-                miso_frame[DB0] = 0x00;
-                miso_frame[DB1] = 0x00;
-                miso_frame[DB2] = 0x00;
-                miso_frame[DB16] = 0x00;
-                miso_frame[DB17] = 0x00;
-                xSemaphoreGive(miso_semaphore_handle);
+                spi_state.miso_frame_[DB0] = 0x00;
+                spi_state.miso_frame_[DB1] = 0x00;
+                spi_state.miso_frame_[DB2] = 0x00;
+                spi_state.miso_frame_[DB16] = 0x00;
+                spi_state.miso_frame_[DB17] = 0x00;
+                xSemaphoreGive(spi_state.miso_semaphore_handle_);
             }
 
             // DB14 bit2 toggles periodically (about every 20 frames)
@@ -475,14 +461,14 @@ static void mhi_poll_task(void *arg)
             continue;
         }
         // swap buffers
-        if(spi_slave_trans.rx_buffer == recvbuf) {
+        if(spi_slave_trans.rx_buffer == &recvbuf) {
           mosi_frame = recvbuf;
           mosi_frame_prev = recvbuf2;
-          spi_slave_trans.rx_buffer = recvbuf2;
+          spi_slave_trans.rx_buffer = &recvbuf2;
         } else {
           mosi_frame = recvbuf2;
           mosi_frame_prev = recvbuf;
-          spi_slave_trans.rx_buffer = recvbuf;
+          spi_slave_trans.rx_buffer = &recvbuf;
         }
         // Transaction must be of a supported length
         if(spi_slave_trans_out->trans_len != MHI_FRAME_LEN_LONG * 8
@@ -499,48 +485,14 @@ static void mhi_poll_task(void *arg)
         }
 
         // Make snapshot if requested
-        if(xSemaphoreTake(snapshot_semaphore_handle, 0) != pdTRUE) {
-            memcpy(mosi_frame_snapshot_prev, mosi_frame_snapshot, sizeof(mosi_frame_snapshot_prev));
-            memcpy(mosi_frame_snapshot, mosi_frame, sizeof(mosi_frame_snapshot));
+        if(xSemaphoreTake(spi_state.snapshot_semaphore_handle_, 0) != pdTRUE) {
+          spi_state.mosi_frame_snapshot_prev_ = spi_state.mosi_frame_snapshot_;
+          std::copy(mosi_frame.begin(), mosi_frame.end(), spi_state.mosi_frame_snapshot_.begin());
         }
-        xSemaphoreGive(snapshot_semaphore_handle);
-
-
-
-        // ********************** Diagnostics ************************
-/*
-        if (frame == 1) {
-            printf("miso packet: %5d    %02x %02x %02x   %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x   %02x %02x (calc %d)  tx_checksum: %d \n",
-                packet_cnt,
-            sendbuf[0],  sendbuf[1],  sendbuf[2],  sendbuf[3],  sendbuf[4],  sendbuf[5],  sendbuf[6],  sendbuf[7],  sendbuf[8],  sendbuf[9],
-            sendbuf[10], sendbuf[11], sendbuf[12], sendbuf[13], sendbuf[14], sendbuf[15], sendbuf[16], sendbuf[17], sendbuf[18], sendbuf[19],
-                (sendbuf[18]<<8)+(sendbuf[19]),
-                tx_checksum
-            );
-            printf("mosi packet: %5d    %02x %02x %02x   %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x   %02x %02x (calc %d)  rx_checksum: %d \n",
-                    packet_cnt,
-                mosi_frame[0],  mosi_frame[1],  mosi_frame[2],  mosi_frame[3],  mosi_frame[4],  mosi_frame[5],  mosi_frame[6],  mosi_frame[7],  mosi_frame[8],  mosi_frame[9],
-                mosi_frame[10], mosi_frame[11], mosi_frame[12], mosi_frame[13], mosi_frame[14], mosi_frame[15], mosi_frame[16], mosi_frame[17], mosi_frame[18], mosi_frame[19],
-                    (mosi_frame[18]<<8)+(mosi_frame[19]),
-                    rx_checksum
-                );
-        }
-        if (frame == 2) {
-            printf("mosi packet: %5d    %02x %02x %02x   %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x   %02x %02x (calc %d)  rx_checksum: %d \n",
-                    packet_cnt,
-                mosi_frame[0],  mosi_frame[1],  mosi_frame[2],  mosi_frame[3],  mosi_frame[4],  mosi_frame[5],  mosi_frame[6],  mosi_frame[7],  mosi_frame[8],  mosi_frame[9],
-                mosi_frame[10], mosi_frame[11], mosi_frame[12], mosi_frame[13], mosi_frame[14], mosi_frame[15], mosi_frame[16], mosi_frame[17], mosi_frame[18], mosi_frame[19],
-                    (mosi_frame[18]<<8)+(mosi_frame[19]),
-                    rx_checksum
-                );
-            printf("\n");
-        }
-*/
-        // ***********************************************************
-
+        xSemaphoreGive(spi_state.snapshot_semaphore_handle_);
 
         // only need to perform updates if there was a change (with no error) since last frame read
-        const int frame_diff = memcmp(mosi_frame, mosi_frame_prev, trans_len_bytes);
+        const int frame_diff = mosi_frame != mosi_frame_prev;
         if (frame_diff) {
             // Evaluate Operating Data and Error Operating Data
             bool MOSI_type_opdata = (mosi_frame[DB10] & 0x30) == 0x10;
@@ -548,7 +500,7 @@ static void mhi_poll_task(void *arg)
             if(mosi_frame[DB9] == 0x90) {
                 if ((mosi_frame[DB6] & 0x80) == 0) {  // 29 CT
                     if (MOSI_type_opdata) {
-                        mhi_energy.set_current(mosi_frame[DB11]);
+                        energy.set_current(mosi_frame[DB11]);
                         //float current = ((int)mosi_frame[DB11] * 14) / 51.0f;
                         //ESP_LOGI(TAG, "Current: %f, raw: %i, *230: %f", current, mosi_frame[DB11], current*230);
                     }
@@ -561,11 +513,9 @@ static void mhi_poll_task(void *arg)
     }
 }
 
-void mhi_ac_ctrl_core_init(const Config& config) {
+void init(const Config& config) {
     esp_err_t err;
 
-    miso_semaphore_handle = xSemaphoreCreateMutexStatic( &miso_semaphore_buffer );
-    snapshot_semaphore_handle = xSemaphoreCreateBinaryStatic( &snapshot_semaphore_buffer );
     gpio_cs_out = config.cs_out;
 
     // configuration for the SPI bus

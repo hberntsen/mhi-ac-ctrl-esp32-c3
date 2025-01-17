@@ -82,7 +82,7 @@ sensor:
 #      - filter_out: nan
 #    on_value:
 #      then:
-#        - lambda: 'mhi_energy.set_voltage(x);'
+#        - lambda: 'mhi_ac::energy.set_voltage(x);'
 
 switch:
   - platform: MhiAcCtrl
