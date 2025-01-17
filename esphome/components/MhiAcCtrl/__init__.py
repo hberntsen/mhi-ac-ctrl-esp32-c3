@@ -39,21 +39,14 @@ CONFIG_SCHEMA = cv.Schema(
 ).extend(cv.COMPONENT_SCHEMA)
 
 async def to_code(config):
-    var = cg.new_Pvariable(config[CONF_ID])
+    config_struct = cg.StructInitializer(
+        ConfigStruct,
+        ("mosi_pin", (await cg.gpio_pin_expression(config[CONF_MOSI_PIN])).get_pin()),
+        ("miso_pin", (await cg.gpio_pin_expression(config[CONF_MISO_PIN])).get_pin()),
+        ("sclk_pin", (await cg.gpio_pin_expression(config[CONF_SCLK_PIN])).get_pin()),
+        ("cs_in_pin", (await cg.gpio_pin_expression(config[CONF_CS_IN_PIN])).get_pin()),
+        ("cs_out_pin", (await cg.gpio_pin_expression(config[CONF_CS_OUT_PIN])).get_pin()),
+    )
 
-    mosi_pin = await cg.gpio_pin_expression(config[CONF_MOSI_PIN])
-    cg.add(var.set_mosi_pin(mosi_pin))
-
-    miso_pin = await cg.gpio_pin_expression(config[CONF_MISO_PIN])
-    cg.add(var.set_miso_pin(miso_pin))
-
-    sclk_pin = await cg.gpio_pin_expression(config[CONF_SCLK_PIN])
-    cg.add(var.set_sclk_pin(sclk_pin))
-
-    cs_in_pin = await cg.gpio_pin_expression(config[CONF_CS_IN_PIN])
-    cg.add(var.set_cs_in_pin(cs_in_pin))
-
-    cs_out_pin = await cg.gpio_pin_expression(config[CONF_CS_OUT_PIN])
-    cg.add(var.set_cs_out_pin(cs_out_pin))
-
+    var = cg.new_Pvariable(config[CONF_ID], config_struct)
     return await cg.register_component(var, config)

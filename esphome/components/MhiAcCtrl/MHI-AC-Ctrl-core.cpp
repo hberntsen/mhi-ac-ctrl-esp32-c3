@@ -516,13 +516,13 @@ static void mhi_poll_task(void *arg)
 void init(const Config& config) {
     esp_err_t err;
 
-    gpio_cs_out = config.cs_out;
+    gpio_cs_out = static_cast<gpio_num_t>(config.cs_out_pin);
 
     // configuration for the SPI bus
     spi_bus_config_t buscfg = {
-        .mosi_io_num = config.mosi,
-        .miso_io_num = config.miso,
-        .sclk_io_num = config.sclk,
+        .mosi_io_num = config.mosi_pin,
+        .miso_io_num = config.miso_pin,
+        .sclk_io_num = config.sclk_pin,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
         .data4_io_num = -1,
@@ -536,7 +536,7 @@ void init(const Config& config) {
 
     // configuration for the SPI slave interface
     spi_slave_interface_config_t slvcfg = {
-        .spics_io_num = config.cs_in,
+        .spics_io_num = config.cs_in_pin,
         .flags = SPI_SLAVE_BIT_LSBFIRST,
         .queue_size = 1,
         .mode = 3,                    //CPOL=1, CPHA=1
@@ -576,7 +576,7 @@ void init(const Config& config) {
 
     gpio_config_t io_conf = {};
     io_conf.mode = GPIO_MODE_INPUT;
-    io_conf.pin_bit_mask = (1ULL<<config.sclk);
+    io_conf.pin_bit_mask = (1ULL<<config.sclk_pin);
 io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     io_conf.pull_up_en = GPIO_PULLUP_ENABLE;                                     // required to prevent abort() caused by floating pin when daughtboard not connected
     io_conf.intr_type = GPIO_INTR_LOW_LEVEL;                    // when this is set to NEGEDGE, DMA sometimes doesn't read the last 4 bytes
@@ -585,8 +585,8 @@ io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     gpio_config(&io_conf);
 
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
-    gpio_isr_handler_add(config.sclk, gpio_isr_handler, NULL);
-    gpio_intr_enable(config.sclk);
+    gpio_isr_handler_add(static_cast<gpio_num_t>(config.sclk_pin), gpio_isr_handler, NULL);
+    gpio_intr_enable(static_cast<gpio_num_t>(config.sclk_pin));
 
     io_conf.mode = GPIO_MODE_OUTPUT;
     io_conf.pin_bit_mask = (1ULL<<gpio_cs_out);

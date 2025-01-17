@@ -221,21 +221,9 @@ public:
 class MhiAcCtrl : public climate::Climate,
                   public Component {
 public:
-    void set_mosi_pin(InternalGPIOPin *pin) {
-        this->ac_config_.mosi = static_cast<gpio_num_t>(pin->get_pin());
-    }
-    void set_miso_pin(InternalGPIOPin *pin) {
-        this->ac_config_.miso = static_cast<gpio_num_t>(pin->get_pin());
-    }
-    void set_sclk_pin(InternalGPIOPin *pin) {
-        this->ac_config_.sclk = static_cast<gpio_num_t>(pin->get_pin());
-    }
-    void set_cs_in_pin(InternalGPIOPin *pin) {
-        this->ac_config_.cs_in = static_cast<gpio_num_t>(pin->get_pin());
-    }
-    void set_cs_out_pin(InternalGPIOPin *pin) {
-        this->ac_config_.cs_out = static_cast<gpio_num_t>(pin->get_pin());
-    }
+  MhiAcCtrl(const mhi_ac::Config &config) {
+    this->ac_config_ = config;
+  }
 
     void setup() override
     {

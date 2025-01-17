@@ -48,11 +48,12 @@
 
 namespace mhi_ac {
 struct Config {
-  gpio_num_t mosi;
-  gpio_num_t miso;
-  gpio_num_t sclk;
-  gpio_num_t cs_in;
-  gpio_num_t cs_out;
+  bool use_long_frame;
+  uint8_t mosi_pin;
+  uint8_t miso_pin;
+  uint8_t sclk_pin;
+  uint8_t cs_in_pin;
+  uint8_t cs_out_pin;
 };
 
 enum class ACPower {
