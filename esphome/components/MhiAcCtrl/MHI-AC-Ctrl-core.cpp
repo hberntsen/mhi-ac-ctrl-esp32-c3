@@ -109,7 +109,7 @@ void mhi_ac_ctrl_core_target_temperature_set(float target_temperature) {
 }
 
 bool mhi_ac_ctrl_core_target_temperature_changed() {
-    return mosi_frame_snapshot[DB2] != mosi_frame_snapshot_prev[DB2];
+  return (mosi_frame_snapshot[DB2] &~ (1 << 7)) != (mosi_frame_snapshot_prev[DB2] &~ (1 << 7));
 }
 
 float mhi_ac_ctrl_core_target_temperature_get() {
