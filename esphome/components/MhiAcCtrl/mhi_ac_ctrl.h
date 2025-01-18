@@ -454,12 +454,12 @@ protected:
 
 protected:
 #ifdef USE_SELECT
-    MhiVanesUD *vanes_ud_select_;
-    MhiVanesLR *vanes_lr_select_;
+    MhiVanesUD *vanes_ud_select_ = nullptr;
+    MhiVanesLR *vanes_lr_select_ = nullptr;
 #endif
-    MhiFrameErrors *frame_errors_sensor_;
-    MhiTotalEnergy *total_energy_sensor_;
-    MhiPower *power_sensor_;
+    MhiFrameErrors *frame_errors_sensor_ = nullptr;
+    MhiTotalEnergy *total_energy_sensor_ = nullptr;
+    MhiPower *power_sensor_ = nullptr;
     mhi_ac::Config ac_config_;
 
 public:
