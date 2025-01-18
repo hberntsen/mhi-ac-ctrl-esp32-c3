@@ -6,6 +6,7 @@
 #include <math.h>
 #include <string.h>
 #include <algorithm>
+#include <ranges>
 
 #include "driver/gptimer.h"
 #include "driver/spi_slave.h"
@@ -493,7 +494,9 @@ static void mhi_poll_task(void *arg)
         // Make snapshot if requested
         if(xSemaphoreTake(spi_state.snapshot_semaphore_handle_, 0) != pdTRUE) {
           spi_state.mosi_frame_snapshot_prev_ = spi_state.mosi_frame_snapshot_;
-          std::copy(mosi_frame.begin(), mosi_frame.end(), spi_state.mosi_frame_snapshot_.begin());
+          std::ranges::copy(
+              mosi_frame | std::views::take(spi_state.mosi_frame_snapshot_.size()),
+              spi_state.mosi_frame_snapshot_.begin());
         }
         xSemaphoreGive(spi_state.snapshot_semaphore_handle_);
 
