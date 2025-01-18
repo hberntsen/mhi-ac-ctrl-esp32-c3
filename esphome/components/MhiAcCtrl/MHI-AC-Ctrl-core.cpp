@@ -30,6 +30,10 @@ static int ready = 0;
 static bool active_mode = false;
 static gpio_num_t gpio_cs_out;
 
+static DMA_ATTR std::array<uint8_t, MHI_FRAME_LEN_LONG> sendbuf;
+static DMA_ATTR std::array<uint8_t, MHI_FRAME_LEN_LONG> recvbuf;
+static DMA_ATTR std::array<uint8_t, MHI_FRAME_LEN_LONG> recvbuf2;
+
 static uint32_t frame_errors = 0;
 
 namespace mhi_ac {
@@ -370,9 +374,6 @@ static void mhi_poll_task(void *arg)
 
     // use WORD_ALIGNED_ATTR when using DMA buffer
     // use 2 recv buffers to be able to check for differences
-    WORD_ALIGNED_ATTR std::array<uint8_t, MHI_FRAME_LEN_LONG> sendbuf;
-    WORD_ALIGNED_ATTR std::array<uint8_t, MHI_FRAME_LEN_LONG> recvbuf;
-    WORD_ALIGNED_ATTR std::array<uint8_t, MHI_FRAME_LEN_LONG> recvbuf2;
     std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame_prev = recvbuf2;
     std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame = recvbuf;
 
