@@ -36,8 +36,6 @@
 #define HEAT_COOL_MASK              0x02            // DB13 0=Cooling, 1=Heating
 #define COMP_ACTIVE_MASK            0x04            // DB13 0=Compressor Idle, 1=Compressor Running
 
-#define MHI_NUM_FRAMES_PER_INTERVAL 20              // every 20 frames, MISO_frame[DB14] bit2 toggles
-
 #ifndef MIN
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 #endif

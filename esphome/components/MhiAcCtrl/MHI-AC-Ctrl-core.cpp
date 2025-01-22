@@ -366,8 +366,7 @@ static void mhi_poll_task(void *arg)
 {
     esp_err_t err = 0;
 
-    uint8_t frame = 0;
-    bool halfcycle = false;
+    uint8_t framecycle = 0;
 
     // use WORD_ALIGNED_ATTR when using DMA buffer
     // use 2 recv buffers to be able to check for differences
@@ -402,56 +401,60 @@ static void mhi_poll_task(void *arg)
 
         if(!active_mode) {
           std::fill(sendbuf.begin(), sendbuf.end(), 0xff);
-        } else if (frame++ >= MHI_NUM_FRAMES_PER_INTERVAL) {
-            halfcycle = !halfcycle;                     // toggle
-            frame = 1;                                  // 2 * MHI_NUM_FRAMES_PER_INTERVAL make a complete cycle. for half that,
-            // MISO_frame[DB14] bit2 is 0, and the other half it is 1. When it is set to 1
-            // the MISO can be set with any new settings
-            if (halfcycle && xSemaphoreTake(spi_state.miso_semaphore_handle_, 0) == pdTRUE) {
-                std::copy(spi_state.miso_frame_.begin(), spi_state.miso_frame_.end(), sendbuf.begin());
-                //request current
-                sendbuf[DB6] = 0x40;
-                sendbuf[DB9] = 0x90; //current
-                // we never change those, right?
-                //sendbuf[DB10] = 0xff;
-                //sendbuf[DB11] = 0xff;
-                //sendbuf[DB12] = 0xff;
+        } else {
+          framecycle++;
 
-                // to set a setting, the same bits are set in the MISO frame
-                // that they are located in the MOSI frame. you also need to
-                // set a specific 'set bit'. this bit stays set (even in the
-                // MOSI frame) until the RC is used. at this point, _all_ set
-                // bits are reset to 0 since we just copied all the new
-                // configuration to the sendbuf. if the RC is used, the
-                // updated setting will appear in the MOSI frame, which is
-                // updated every frame. once every ~40 frames (2 *
-                // MHI_NUM_FRAMES_PER_INTERVAL), the MISO frame is set (in
-                // this loop) with any settings that have changed in the ESP
+          // Send data once every 3 frames.
+          //
+          // Every other frame seems to be okay for short frames, for long frames the AC does not accept commands when
+          // toggling every other frame. It will also automatically turn off when it was on before the upgrade and we
+          // switch to sending commands every other frame.
+          if (framecycle >= 3 && xSemaphoreTake(spi_state.miso_semaphore_handle_, 0) == pdTRUE) {
+            framecycle = 0;
+            std::copy(spi_state.miso_frame_.begin(), spi_state.miso_frame_.end(), sendbuf.begin());
 
-                spi_state.miso_frame_[DB0] = 0x00;
-                spi_state.miso_frame_[DB1] = 0x00;
-                spi_state.miso_frame_[DB2] = 0x00;
-                spi_state.miso_frame_[DB16] = 0x00;
-                spi_state.miso_frame_[DB17] = 0x00;
-                xSemaphoreGive(spi_state.miso_semaphore_handle_);
-            }
+            // DB14, to indicate we are setting things?
+            sendbuf[DB14] = 0x04;
 
-            // DB14 bit2 toggles periodically (about every 20 frames)
-            sendbuf[DB14] = halfcycle << 2;
+            //opdata: request current
+            sendbuf[DB6] = 0x40;
+            sendbuf[DB9] = 0x90; //current
 
-            // calculate checksum for the short frame
-            uint16_t tx_checksum = 0;
-            for (uint8_t byte_cnt = 0; byte_cnt < CBH; byte_cnt++) {
-                tx_checksum += sendbuf[byte_cnt];
-            }
-            sendbuf[CBH] = tx_checksum>>8;
-            sendbuf[CBL] = tx_checksum;
+            // we never change those, right?
+            //sendbuf[DB10] = 0xff;
+            //sendbuf[DB11] = 0xff;
+            //sendbuf[DB12] = 0xff;
 
-            // Continue calculating for the long frame
-            for (uint8_t byte_cnt = CBH; byte_cnt < CBL2; byte_cnt++) {
+            // to set a setting, the same bits are set in the MISO frame
+            // that they are located in the MOSI frame. you also need to
+            // set a specific 'set bit'. this bit stays set (even in the
+            // MOSI frame) until the RC is used. at this point, _all_ set
+            // bits are reset to 0 since we just copied all the new
+            // configuration to the sendbuf. if the RC is used, the
+            // updated setting will appear in the MOSI frame
+            spi_state.miso_frame_[DB0] = 0x00;
+            spi_state.miso_frame_[DB1] = 0x00;
+            spi_state.miso_frame_[DB2] = 0x00;
+            spi_state.miso_frame_[DB16] = 0x00;
+            spi_state.miso_frame_[DB17] = 0x00;
+            xSemaphoreGive(spi_state.miso_semaphore_handle_);
+          } else {
+            sendbuf[DB14] = 0;
+          }
+
+          // calculate checksum for the short frame
+          uint16_t tx_checksum = 0;
+          for (uint8_t byte_cnt = 0; byte_cnt < CBH; byte_cnt++) {
               tx_checksum += sendbuf[byte_cnt];
-            }
-            sendbuf[CBL2] = tx_checksum;
+          }
+          sendbuf[CBH] = tx_checksum>>8;
+          sendbuf[CBL] = tx_checksum;
+
+          // Continue calculating for the long frame
+          for (uint8_t byte_cnt = CBH; byte_cnt < CBL2; byte_cnt++) {
+            tx_checksum += sendbuf[byte_cnt];
+          }
+          sendbuf[CBL2] = tx_checksum;
         }
 
 
