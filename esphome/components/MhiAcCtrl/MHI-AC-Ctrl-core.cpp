@@ -369,8 +369,6 @@ static void mhi_poll_task(void *arg)
     uint8_t frame = 0;
     bool halfcycle = false;
 
-    uint16_t tx_checksum = 0;
-
     // use WORD_ALIGNED_ATTR when using DMA buffer
     // use 2 recv buffers to be able to check for differences
     std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame_prev = recvbuf2;
@@ -442,7 +440,7 @@ static void mhi_poll_task(void *arg)
             sendbuf[DB14] = halfcycle << 2;
 
             // calculate checksum for the short frame
-            tx_checksum = 0;
+            uint16_t tx_checksum = 0;
             for (uint8_t byte_cnt = 0; byte_cnt < CBH; byte_cnt++) {
                 tx_checksum += sendbuf[byte_cnt];
             }
