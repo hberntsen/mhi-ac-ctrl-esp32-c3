@@ -369,7 +369,6 @@ static void mhi_poll_task(void *arg)
     uint8_t frame = 0;
     bool halfcycle = false;
 
-    uint16_t rx_checksum = 0;
     uint16_t tx_checksum = 0;
 
     // use WORD_ALIGNED_ATTR when using DMA buffer
