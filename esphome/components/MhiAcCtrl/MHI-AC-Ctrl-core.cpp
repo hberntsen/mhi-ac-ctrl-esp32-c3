@@ -40,6 +40,13 @@ namespace mhi_ac {
 Energy energy(230);
 SpiState spi_state;
 
+enum class SPICycleState : unsigned {
+  START = 0, // Read out SpiState's changes and send to AC, set DB14
+  // State where DB14 is set and we keep sending the same changes
+  SET_LAST = 1, // Last cycle where we send our changes
+  // Between SET_LAST and including last is DB14 is unset
+  LAST = 3,
+};
 
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
@@ -366,7 +373,7 @@ static void mhi_poll_task(void *arg)
 {
     esp_err_t err = 0;
 
-    uint8_t framecycle = 0;
+    unsigned cycle_state = 0;
 
     // use WORD_ALIGNED_ATTR when using DMA buffer
     // use 2 recv buffers to be able to check for differences
@@ -402,15 +409,8 @@ static void mhi_poll_task(void *arg)
         if(!active_mode) {
           std::fill(sendbuf.begin(), sendbuf.end(), 0xff);
         } else {
-          framecycle++;
-
-          // Send data once every 3 frames.
-          //
-          // Every other frame seems to be okay for short frames, for long frames the AC does not accept commands when
-          // toggling every other frame. It will also automatically turn off when it was on before the upgrade and we
-          // switch to sending commands every other frame.
-          if (framecycle >= 3 && xSemaphoreTake(spi_state.miso_semaphore_handle_, 0) == pdTRUE) {
-            framecycle = 0;
+          if (cycle_state == static_cast<unsigned>(SPICycleState::START)
+              && xSemaphoreTake(spi_state.miso_semaphore_handle_, 0) == pdTRUE) {
             std::copy(spi_state.miso_frame_.begin(), spi_state.miso_frame_.end(), sendbuf.begin());
 
             // DB14, to indicate we are setting things?
@@ -438,6 +438,10 @@ static void mhi_poll_task(void *arg)
             spi_state.miso_frame_[DB16] = 0x00;
             spi_state.miso_frame_[DB17] = 0x00;
             xSemaphoreGive(spi_state.miso_semaphore_handle_);
+          }
+
+          if (cycle_state <= (unsigned)SPICycleState::SET_LAST) {
+            sendbuf[DB14] = 4;
           } else {
             sendbuf[DB14] = 0;
           }
@@ -519,6 +523,12 @@ static void mhi_poll_task(void *arg)
                     }
                 }
             }
+	}
+
+        if(cycle_state == static_cast<unsigned>(SPICycleState::LAST)) {
+          cycle_state = static_cast<unsigned>(SPICycleState::START);
+        } else {
+          cycle_state++;
         }
     }
 }
