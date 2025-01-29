@@ -33,9 +33,9 @@ public:
     }
 };
 
-class MhiTotalEnergy : public Sensor {
+class MhiIntegratedTotalEnergy : public Sensor {
 public:
-    MhiTotalEnergy() {
+    MhiIntegratedTotalEnergy() {
         this->total_energy_ = mhi_ac::energy.total_energy.load();
         publish_total();
     }
@@ -243,8 +243,8 @@ public:
         }
         this->status_clear_warning();
 
-        if(total_energy_sensor_)
-            total_energy_sensor_->loop();
+        if(integrated_total_energy_sensor_)
+            integrated_total_energy_sensor_->loop();
         if(power_sensor_)
             power_sensor_->loop();
         if(frame_errors_sensor_)
@@ -458,7 +458,7 @@ protected:
     MhiVanesLR *vanes_lr_select_ = nullptr;
 #endif
     MhiFrameErrors *frame_errors_sensor_ = nullptr;
-    MhiTotalEnergy *total_energy_sensor_ = nullptr;
+    MhiIntegratedTotalEnergy *integrated_total_energy_sensor_ = nullptr;
     MhiPower *power_sensor_ = nullptr;
     mhi_ac::Config ac_config_;
 
@@ -477,8 +477,8 @@ public:
         this->frame_errors_sensor_ = sensor;
     }
 
-    void set_total_energy_sensor(MhiTotalEnergy *sensor) {
-        this->total_energy_sensor_ = sensor;
+    void set_integrated_total_energy_sensor(MhiIntegratedTotalEnergy *sensor) {
+        this->integrated_total_energy_sensor_ = sensor;
     }
 
     void set_power_sensor(MhiPower *sensor) {

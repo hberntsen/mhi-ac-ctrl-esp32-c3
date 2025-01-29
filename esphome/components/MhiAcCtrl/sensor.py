@@ -16,18 +16,18 @@ from esphome.const import (
 from . import MhiAcCtrl, CONF_MHI_AC_CTRL_ID
 
 CONF_FRAME_ERRORS = "frame_errors"
-CONF_TOTAL_ENERGY = "total_energy"
+CONF_INTEGRATED_TOTAL_ENERGY = "integrated_total_energy"
 CONF_CLIMATE_CURRENT_TEMPERATURE = "climate_current_temperature"
 
 TYPES = [
-    CONF_TOTAL_ENERGY,
+    CONF_INTEGRATED_TOTAL_ENERGY,
     CONF_POWER,
     CONF_FRAME_ERRORS,
     CONF_CLIMATE_CURRENT_TEMPERATURE
 ]
 
 MhiFrameErrors = cg.global_ns.class_("MhiFrameErrors", cg.Component, sensor.Sensor)
-MhiTotalEnergy = cg.global_ns.class_("MhiTotalEnergy", cg.Component, sensor.Sensor)
+MhiIntegratedTotalEnergy = cg.global_ns.class_("MhiIntegratedTotalEnergy", cg.Component, sensor.Sensor)
 MhiPower = cg.global_ns.class_("MhiPower", cg.Component, sensor.Sensor)
 
 CONFIG_SCHEMA = cv.All(
@@ -35,8 +35,8 @@ CONFIG_SCHEMA = cv.All(
         {
             cv.GenerateID(): cv.declare_id(MhiAcCtrl),
             cv.GenerateID(CONF_MHI_AC_CTRL_ID): cv.use_id(MhiAcCtrl),
-            cv.Optional(CONF_TOTAL_ENERGY): sensor.sensor_schema(
-                class_=MhiTotalEnergy,
+            cv.Optional(CONF_INTEGRATED_TOTAL_ENERGY): sensor.sensor_schema(
+                class_=MhiIntegratedTotalEnergy,
                 unit_of_measurement=UNIT_WATT_HOURS,
                 device_class=DEVICE_CLASS_ENERGY,
                 state_class=STATE_CLASS_TOTAL_INCREASING,

@@ -53,7 +53,7 @@ select:
 sensor:
   - platform: MhiAcCtrl
     mhi_ac_ctrl_id: ${mhi_device_id}
-    total_energy:
+    integrated_total_energy:
       name: ${device_name} Energy
       filters:
         - throttle: 60s
