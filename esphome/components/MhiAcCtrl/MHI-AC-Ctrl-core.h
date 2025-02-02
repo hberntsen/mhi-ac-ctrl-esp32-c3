@@ -9,6 +9,7 @@
 #include "freertos/semphr.h"
 
 #include "MHI-AC-Ctrl-internal.h"
+#include "MHI-AC-CTRL-operation-data.h"
 
 // # Config
 #define RCV_HOST                    SPI2_HOST
@@ -216,5 +217,6 @@ protected:
 
 extern Energy energy;
 extern SpiState spi_state;
+extern operation_data::State operation_data_state;
 
 } // namespace mhi_ac

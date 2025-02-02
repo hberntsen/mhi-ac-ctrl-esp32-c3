@@ -45,7 +45,8 @@ select:
     vanes_ud:
       name: ${device_name} Vanes Up Down
       id: ${device_id}_vanes_ud
-    # The 3D auto setting and vanes_lr only work when use_long_frame is set to true
+    # The 3D auto setting and vanes_lr only work when use_long_frame is set to
+    # true
     vanes_lr:
       name: ${device_name} Vanes Left Right
       id: ${device_id}_vanes_lr
@@ -53,17 +54,14 @@ select:
 sensor:
   - platform: MhiAcCtrl
     mhi_ac_ctrl_id: ${mhi_device_id}
-    integrated_total_energy:
-      name: ${device_name} Energy
-      filters:
-        - throttle: 60s
-    power:
-      name: ${device_name} Power
+    # Counts SPI frames that did not look right. Usually a few at boot or when
+    # switching active mode
     frame_errors:
       name: ${device_name} Frame errors
+
     # Special sensor to filter out bursts of (small) temperature changes. When
     # this sensor is present, the current temperature in the climate component
-    # will use the filtered value from this sensor..
+    # will use the filtered value from this sensor.
     #
     # Use case: filtering out temperature jitter. See
     # https://github.com/hberntsen/mhi-ac-ctrl-esp32-c3/issues/5
@@ -77,6 +75,104 @@ sensor:
         - round: 0
         # The climate component will only send updates if the value is different
 
+    # Operation data based sensors
+    #
+    # These sensors provide some internal stats, not all interesting. Similarly
+    # to the rest of the sensors: only keep the ones you'll actually look at.
+
+    # Data is requested sensor by sensor (when present) from the AC, which
+    # should always answer, but might not. The timeout sensor counts how many
+    # requests were not answered. It is curerntly normal to have like 150 or so
+    # per day.
+    operation_data_timeouts:
+      name: ${device_name} operation data timeouts
+
+    # In steps of 14/51A
+    current:
+      name: ${device_name} current
+
+    # Using the current from the operation data, multiplied by 230V, or the
+    # value set using from, i.e. a home assistant voltage sensor. See later in
+    # this file.
+    power:
+      name: ${device_name} power
+    # Integrates the power sensor above into energy usage, as an alternative to
+    # the internal sensor. Assumes 5W idle usage. The heavier the AC is used,
+    # the less accurate it seems compared to an external power meter (like, the
+    # actual usage can be a factor of 1.6 times higher). It can also be on-par
+    # whith less heavy load.
+    # Not sure yet which is more accurate.
+    integrated_total_energy:
+      name: ${device_name} energy
+      filters:
+        - throttle: 60s
+
+    # The energy usage provided by the AC, in steps of 250Wh. It will not reset
+    # regularly, but not exactly midnight. So you can better create a Utility
+    # Meter helper in Home Assistant that does. Use this sensor as input and
+    # choose a reset cycle. Net consumption, delta values switches off,
+    # periodically resetting on.
+    energy_used:
+      name: ${device_name} energy used
+
+    # The internal target temperature for the AC. This can be different from
+    # the target temperature in the climate sensor:
+    # * With eco mode
+    # * + 2 degrees celcius when heating, unless the built in countermeasure
+    #   for excessive temperature rise is used.
+    set_temperature:
+      name: ${device_name} set temperature
+    return_air_temperature:
+      name: ${device_name} return air temperature
+    # More granular fan speed than we can see in the climate directly
+    indoor_fan_speed:
+      name: ${device_name} indoor fan speed
+
+    # 100 hour granularity
+    indoor_total_run_hours:
+      name: ${device_name} indoor total run hours
+    compressor_total_run_hours:
+      name: ${device_name} compressor total run hours
+
+    outdoor_air_temperature:
+      name: ${device_name} outdoor air temperature
+    discharge_pipe_temperature:
+      name: ${device_name} discharge pipe temperature
+
+    compressor_protection_state_number:
+      name: ${device_name} compressor protection state number
+    outdoor_fan_speed:
+      name: ${device_name} outdoor fan speed
+    outdoor_expansion_valve_pulse_rate:
+      name: ${device_name} outdoor expansion valve pulse rate
+
+
+    # Calculation marked as 'to be confirmed' in mhi-ac-ctrl
+    compressor_frequency:
+      name: ${device_name} compressor frequency
+
+    # These two are marked as only a rough apprximation in mhi-ac-ctrl
+    indoor_u_bend_temperature:
+      name: ${device_name} indoor u-bend temperature
+    indoor_suction_header_temperature:
+      name: ${device_name} indoor suction header temperature
+
+    # Formula for calculation not known for the following sensors:
+    indoor_capillary_temperature:
+      name: ${device_name} indoor capillary temperature
+    outdoor_heat_exchanger_temperature_1:
+      name: ${device_name} outdoor heat exchanger temperature 1
+    compressor_discharge_pipe_super_heat_temperature:
+      name: ${device_name} discharge pipe super heat temperature
+
+binary_sensor:
+  - platform: MhiAcCtrl
+    mhi_ac_ctrl_id: ${mhi_device_id}
+    # Defrosting sensor via operation data
+    defrosting:
+      name: ${device_name} defrosting
+
+#  # For setting the current voltage, so we can calculate the used power
 #  - platform: homeassistant
 #    name: "Voltage"
 #    entity_id: sensor.voltage_l3

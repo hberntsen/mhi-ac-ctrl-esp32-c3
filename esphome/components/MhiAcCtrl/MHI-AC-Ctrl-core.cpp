@@ -13,6 +13,8 @@
 #include "driver/gpio.h"
 
 #include "esp_log.h"
+
+#include "MHI-AC-CTRL-operation-data.h"
 static const char *TAG = "MHI-AC-CTRL-core";
 
 using namespace mhi_ac;
@@ -39,6 +41,7 @@ static uint32_t frame_errors = 0;
 namespace mhi_ac {
 Energy energy(230);
 SpiState spi_state;
+operation_data::State operation_data_state;
 
 enum class SPICycleState : unsigned {
   START = 0, // Read out SpiState's changes and send to AC, set DB14
@@ -372,7 +375,6 @@ static int validate_frame(std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame, u
 static void mhi_poll_task(void *arg)
 {
     esp_err_t err = 0;
-
     unsigned cycle_state = 0;
 
     // use WORD_ALIGNED_ATTR when using DMA buffer
@@ -413,12 +415,10 @@ static void mhi_poll_task(void *arg)
               && xSemaphoreTake(spi_state.miso_semaphore_handle_, 0) == pdTRUE) {
             std::copy(spi_state.miso_frame_.begin(), spi_state.miso_frame_.end(), sendbuf.begin());
 
+            operation_data_state.on_miso(sendbuf);
+
             // DB14, to indicate we are setting things?
             sendbuf[DB14] = 0x04;
-
-            //opdata: request current
-            sendbuf[DB6] = 0x40;
-            sendbuf[DB9] = 0x90; //current
 
             // we never change those, right?
             //sendbuf[DB10] = 0xff;
@@ -505,25 +505,22 @@ static void mhi_poll_task(void *arg)
         }
         xSemaphoreGive(spi_state.snapshot_semaphore_handle_);
 
-        // only need to perform updates if there was a change (with no error) since last frame read
-        const int frame_diff = mosi_frame != mosi_frame_prev;
-        if (frame_diff) {
-            // Evaluate Operating Data and Error Operating Data
-            bool MOSI_type_opdata = (mosi_frame[DB10] & 0x30) == 0x10;
+        // We get both last and first the same operation data. last is first so only use this one
+        if(cycle_state == static_cast<unsigned>(SPICycleState::LAST)) {
+          // DB4 becomes 1 after a while when active mode is turned off, ignore that
+          if(mosi_frame[DB4] > 0 && !(mosi_frame[DB4] == 1 && !active_mode)) {
+            ESP_LOGW(TAG, "DB4 error %i", mosi_frame[DB4]);
+          }
 
-            if(mosi_frame[DB9] == 0x90) {
-                if ((mosi_frame[DB6] & 0x80) == 0) {  // 29 CT
-                    if (MOSI_type_opdata) {
-                        energy.set_current(mosi_frame[DB11]);
-                        //float current = ((int)mosi_frame[DB11] * 14) / 51.0f;
-                        //ESP_LOGI(TAG, "Current: %f, raw: %i, *230: %f", current, mosi_frame[DB11], current*230);
-                    }
-                    else {
-                        ESP_LOGW(TAG, "Current: error: %i", mosi_frame[DB11]);
-                    }
-                }
-            }
-	}
+          operation_data_state.on_mosi(mosi_frame);
+
+          if(mosi_frame[DB9] == 0x90 && (mosi_frame[DB6] & 0x80) == 0 && (mosi_frame[DB10] & 0x30) == 0x10) {
+            // 29 CT
+            energy.set_current(mosi_frame[DB11]);
+            float current = ((int)mosi_frame[DB11] * 14) / 51.0f;
+            ESP_LOGD(TAG, "Current: %f, raw: %i, *230: %f", current, mosi_frame[DB11], current*230);
+          }
+        }
 
         if(cycle_state == static_cast<unsigned>(SPICycleState::LAST)) {
           cycle_state = static_cast<unsigned>(SPICycleState::START);

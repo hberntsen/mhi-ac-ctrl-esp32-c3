@@ -9,6 +9,9 @@
 #ifdef USE_SELECT
 #include "esphome/components/select/select.h"
 #endif
+#ifdef USE_BINARY_SENSOR
+#include "esphome/components/binary_sensor/binary_sensor.h"
+#endif
 
 
 using namespace esphome;
@@ -232,6 +235,29 @@ public:
         //current_power.set_accuracy_decimals(2);
 
         mhi_ac::init(this->ac_config_);
+
+        constexpr auto opdatas = &mhi_ac::operation_data_state;
+        opdatas->set_temperature_.enabled = this->set_temperature_sensor_;
+        opdatas->return_air_temperature_.enabled = this->return_air_temperature_sensor_;
+        opdatas->indoor_u_bend_temperature_.enabled = this->indoor_u_bend_temperature_sensor_;
+        opdatas->indoor_capillary_temperature_.enabled = this->indoor_capillary_temperature_sensor_;
+        opdatas->indoor_suction_header_temperature_.enabled = this->indoor_suction_header_temperature_sensor_;
+        opdatas->indoor_fan_speed_.enabled = this->indoor_fan_speed_sensor_;
+        opdatas->indoor_total_run_hours_.enabled = this->indoor_total_run_hours_sensor_;
+        opdatas->outdoor_air_temperature_.enabled = this->outdoor_air_temperature_sensor_;
+        opdatas->outdoor_heat_exchanger_temperature_1_.enabled = this->outdoor_heat_exchanger_temperature_1_sensor_;
+        opdatas->compressor_frequency_.enabled = this->compressor_frequency_sensor_;
+        opdatas->discharge_pipe_temperature_.enabled = this->discharge_pipe_temperature_sensor_;
+        opdatas->current_.enabled = this->current_sensor_ || this->integrated_total_energy_sensor_ || this->power_sensor_;
+        opdatas->compressor_discharge_pipe_super_heat_temperature_.enabled = this->compressor_discharge_pipe_super_heat_temperature_sensor_;
+        opdatas->compressor_protection_state_number_.enabled = this->compressor_protection_state_number_sensor_;
+        opdatas->outdoor_fan_speed_.enabled = this->outdoor_fan_speed_sensor_;
+        opdatas->compressor_total_run_hours_.enabled = this->compressor_total_run_hours_sensor_;
+        opdatas->outdoor_expansion_valve_pulse_rate_.enabled = this->outdoor_expansion_valve_pulse_rate_sensor_;
+        opdatas->energy_used_.enabled = this->energy_used_sensor_;
+#ifdef USE_BINARY_SENSOR
+        opdatas->defrosting_.enabled = this->defrosting_binary_sensor_;
+#endif
     }
 
     void loop() override
@@ -256,6 +282,7 @@ public:
             vanes_lr_select_->loop();
 #endif
         bool first_time = std::isnan(this->target_temperature);
+        this->loop_operation_data(first_time);
 
         if(mhi_ac::spi_state.target_temperature_changed() || first_time) {
           publish_self_state = true;
@@ -360,6 +387,50 @@ public:
     }
 
 protected:
+    void loop_operation_data(bool first_time) {
+      constexpr auto opdatas = &mhi_ac::operation_data_state;
+      if(!opdatas ->value_semaphore_take()) {
+        return;
+      }
+
+      if(this->operation_data_timeouts_sensor_
+          && this->operation_data_timeouts_sensor_->get_raw_state() != opdatas->timeouts) {
+        this->operation_data_timeouts_sensor_->publish_state(opdatas->timeouts);
+      }
+
+      auto update_sensor = [first_time](auto* sensor, auto operation_data) {
+        if(sensor) {
+          if(operation_data->has_value && (operation_data->was_changed() || first_time)) {
+            sensor->publish_state(operation_data->get_reset_changed());
+          }
+        }
+      };
+
+      update_sensor(this->set_temperature_sensor_, &opdatas->set_temperature_);
+      update_sensor(this->return_air_temperature_sensor_, &opdatas->return_air_temperature_);
+      update_sensor(this->indoor_u_bend_temperature_sensor_, &opdatas->indoor_u_bend_temperature_);
+      update_sensor(this->indoor_capillary_temperature_sensor_, &opdatas->indoor_capillary_temperature_);
+      update_sensor(this->indoor_suction_header_temperature_sensor_, &opdatas->indoor_suction_header_temperature_);
+      update_sensor(this->indoor_fan_speed_sensor_, &opdatas->indoor_fan_speed_);
+      update_sensor(this->indoor_total_run_hours_sensor_, &opdatas->indoor_total_run_hours_);
+      update_sensor(this->outdoor_air_temperature_sensor_, &opdatas->outdoor_air_temperature_);
+      update_sensor(this->outdoor_heat_exchanger_temperature_1_sensor_, &opdatas->outdoor_heat_exchanger_temperature_1_);
+      update_sensor(this->compressor_frequency_sensor_, &opdatas->compressor_frequency_);
+      update_sensor(this->discharge_pipe_temperature_sensor_, &opdatas->discharge_pipe_temperature_);
+      update_sensor(this->current_sensor_, &opdatas->current_);
+      update_sensor(this->compressor_discharge_pipe_super_heat_temperature_sensor_, &opdatas->compressor_discharge_pipe_super_heat_temperature_);
+      update_sensor(this->compressor_protection_state_number_sensor_, &opdatas->compressor_protection_state_number_);
+      update_sensor(this->outdoor_fan_speed_sensor_, &opdatas->outdoor_fan_speed_);
+      update_sensor(this->compressor_total_run_hours_sensor_, &opdatas->compressor_total_run_hours_);
+      update_sensor(this->outdoor_expansion_valve_pulse_rate_sensor_, &opdatas->outdoor_expansion_valve_pulse_rate_);
+      update_sensor(this->energy_used_sensor_, &opdatas->energy_used_);
+#ifdef USE_BINARY_SENSOR
+      update_sensor(this->defrosting_binary_sensor_, &opdatas->defrosting_);
+#endif
+
+      opdatas->value_semaphore_give();
+    }
+
     /// Transmit the state of this climate controller.
     void control(const climate::ClimateCall& call) override
     {
@@ -451,6 +522,29 @@ protected:
     const std::string custom_fan_ultra_low = std::string("Ultra Low");
 
     SUB_SENSOR(climate_current_temperature)
+
+    SUB_SENSOR(operation_data_timeouts)
+    SUB_SENSOR(set_temperature)
+    SUB_SENSOR(return_air_temperature)
+    SUB_SENSOR(indoor_u_bend_temperature)
+    SUB_SENSOR(indoor_capillary_temperature)
+    SUB_SENSOR(indoor_suction_header_temperature)
+    SUB_SENSOR(indoor_fan_speed)
+    SUB_SENSOR(indoor_total_run_hours)
+    SUB_SENSOR(outdoor_air_temperature)
+    SUB_SENSOR(outdoor_heat_exchanger_temperature_1)
+    SUB_SENSOR(compressor_frequency)
+    SUB_SENSOR(discharge_pipe_temperature)
+    SUB_SENSOR(current)
+    SUB_SENSOR(compressor_discharge_pipe_super_heat_temperature)
+    SUB_SENSOR(compressor_protection_state_number)
+    SUB_SENSOR(outdoor_fan_speed)
+    SUB_SENSOR(compressor_total_run_hours)
+    SUB_SENSOR(outdoor_expansion_valve_pulse_rate)
+    SUB_SENSOR(energy_used)
+#ifdef USE_BINARY_SENSOR
+    SUB_BINARY_SENSOR(defrosting)
+#endif
 
 protected:
 #ifdef USE_SELECT
