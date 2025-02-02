@@ -230,10 +230,6 @@ public:
 
     void setup() override
     {
-        //current_power.set_icon("mdi:current-ac");
-        //current_power.set_unit_of_measurement("A");
-        //current_power.set_accuracy_decimals(2);
-
         mhi_ac::init(this->ac_config_);
 
         constexpr auto opdatas = &mhi_ac::operation_data_state;

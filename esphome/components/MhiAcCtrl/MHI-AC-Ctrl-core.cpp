@@ -377,7 +377,6 @@ static void mhi_poll_task(void *arg)
     esp_err_t err = 0;
     unsigned cycle_state = 0;
 
-    // use WORD_ALIGNED_ATTR when using DMA buffer
     // use 2 recv buffers to be able to check for differences
     std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame_prev = recvbuf2;
     std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame = recvbuf;
@@ -413,6 +412,7 @@ static void mhi_poll_task(void *arg)
         } else {
           if (cycle_state == static_cast<unsigned>(SPICycleState::START)
               && xSemaphoreTake(spi_state.miso_semaphore_handle_, 0) == pdTRUE) {
+
             std::copy(spi_state.miso_frame_.begin(), spi_state.miso_frame_.end(), sendbuf.begin());
 
             operation_data_state.on_miso(sendbuf);
