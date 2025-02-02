@@ -141,8 +141,8 @@ public:
   void three_d_auto_set(bool new_state);
 
   std::array<uint8_t, internal::CBL2> miso_frame_;
-  std::array<uint8_t, internal::DB26> mosi_frame_snapshot_;
-  std::array<uint8_t, internal::DB26> mosi_frame_snapshot_prev_;
+  std::array<uint8_t, internal::DB19> mosi_frame_snapshot_;
+  std::array<uint8_t, internal::DB19> mosi_frame_snapshot_prev_;
   SemaphoreHandle_t miso_semaphore_handle_;
   StaticSemaphore_t miso_semaphore_buffer_;
   SemaphoreHandle_t snapshot_semaphore_handle_;
