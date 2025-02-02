@@ -82,9 +82,24 @@ static bool IRAM_ATTR gptimer_isr_callback(gptimer_handle_t timer, const gptimer
     return false;
 }
 
-bool SpiState::update_snapshot(uint32_t wait_time_ms) {
-  xSemaphoreTake(this->snapshot_semaphore_handle_, 0);
-  return xSemaphoreTake(this->snapshot_semaphore_handle_, pdMS_TO_TICKS(wait_time_ms));
+bool SpiState::snapshot_semaphore_take() {
+  return xSemaphoreTake(this->snapshot_semaphore_handle_, 0) == pdTRUE;
+}
+
+void SpiState::snapshot_semaphore_give() {
+  xSemaphoreGive(this->snapshot_semaphore_handle_);
+}
+
+void SpiState::set_snapshot_as_previous() {
+  this->mosi_frame_snapshot_prev_ = this->mosi_frame_snapshot_;
+}
+
+static bool validate_signature(uint8_t sb0, uint8_t sb1, uint8_t sb2) {
+  return (sb0 & 0xfe) == 0x6c && sb1 == 0x80 && sb2 == 0x04;
+}
+
+bool SpiState::has_received_data() {
+  return validate_signature(this->mosi_frame_snapshot_[SB0], this->mosi_frame_snapshot_[SB1], this->mosi_frame_snapshot_[SB2]);
 }
 
 void SpiState::use_long_frame(bool long_frame_enabled) {
@@ -319,7 +334,7 @@ void SpiState::three_d_auto_set(bool new_state) {
 }
 
 static int validate_frame_short(std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame, uint16_t rx_checksum) {
-  if ( ((mosi_frame[SB0] & 0xfe) != 0x6c) | (mosi_frame[SB1] != 0x80) | (mosi_frame[SB2] != 0x04) ) {
+  if (! validate_signature(mosi_frame[SB0], mosi_frame[SB1], mosi_frame[SB2])) {
     ESP_LOGW(TAG, "wrong MOSI signature. 0x%02x 0x%02x 0x%02x",
                 mosi_frame[0], mosi_frame[1], mosi_frame[2]);
 
@@ -496,14 +511,13 @@ static void mhi_poll_task(void *arg)
           continue;
         }
 
-        // Make snapshot if requested
-        if(xSemaphoreTake(spi_state.snapshot_semaphore_handle_, 0) != pdTRUE) {
-          spi_state.mosi_frame_snapshot_prev_ = spi_state.mosi_frame_snapshot_;
+        // Snapshot data when not in use
+        if(xSemaphoreTake(spi_state.snapshot_semaphore_handle_, 0) == pdTRUE) {
           std::ranges::copy(
               mosi_frame | std::views::take(spi_state.mosi_frame_snapshot_.size()),
               spi_state.mosi_frame_snapshot_.begin());
+          xSemaphoreGive(spi_state.snapshot_semaphore_handle_);
         }
-        xSemaphoreGive(spi_state.snapshot_semaphore_handle_);
 
         // We get both last and first the same operation data. last is first so only use this one
         if(cycle_state == static_cast<unsigned>(SPICycleState::LAST)) {

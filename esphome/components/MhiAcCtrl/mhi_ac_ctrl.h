@@ -256,14 +256,17 @@ public:
 #endif
     }
 
-    void loop() override
-    {
+    void loop() override {
         bool publish_self_state = false;
-        if(!mhi_ac::spi_state.update_snapshot(100)) {
+        if(!mhi_ac::spi_state.has_received_data()) {
           this->status_set_warning("No MHI AC communication");
           return;
         }
         this->status_clear_warning();
+
+        if(!mhi_ac::spi_state.snapshot_semaphore_take()) {
+          return;
+        }
 
         if(integrated_total_energy_sensor_)
             integrated_total_energy_sensor_->loop();
@@ -278,7 +281,6 @@ public:
             vanes_lr_select_->loop();
 #endif
         bool first_time = std::isnan(this->target_temperature);
-        this->loop_operation_data(first_time);
 
         if(mhi_ac::spi_state.target_temperature_changed() || first_time) {
           publish_self_state = true;
@@ -380,6 +382,11 @@ public:
         if(publish_self_state) {
             this->publish_state();
         }
+
+        mhi_ac::spi_state.set_snapshot_as_previous();
+        mhi_ac::spi_state.snapshot_semaphore_give();
+
+        this->loop_operation_data(first_time);
     }
 
 protected:

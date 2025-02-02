@@ -97,10 +97,17 @@ public:
 //                          db25  db26 (chk2L not needed)
                             0xff, 0xff } {
     miso_semaphore_handle_ = xSemaphoreCreateMutexStatic( &this->miso_semaphore_buffer_ );
+    xSemaphoreGive(this->miso_semaphore_handle_);
     snapshot_semaphore_handle_ = xSemaphoreCreateBinaryStatic( &this->snapshot_semaphore_buffer_ );
+    xSemaphoreGive(this->snapshot_semaphore_handle_);
   }
 
-  bool update_snapshot(uint32_t wait_time_ms);
+  void snapshot_semaphore_give();
+  bool snapshot_semaphore_take();
+
+  void set_snapshot_as_previous();
+  bool has_received_data();
+
   void use_long_frame(bool long_frame_enabled);
 
   bool target_temperature_changed() const;
