@@ -405,6 +405,14 @@ protected:
         if(sensor) {
           if(operation_data->has_value && (operation_data->was_changed() || first_time)) {
             sensor->publish_state(operation_data->get_reset_changed());
+          } else if(!operation_data->has_value) {
+            // The boolean defrost sensor does not have get_raw_state and cannot be set to NAN to indicate we don't have
+            // a proper value
+            if constexpr (requires { sensor->get_raw_state(); }) {
+              if(!std::isnan(sensor->get_raw_state())) {
+                sensor->publish_state(NAN);
+              }
+            }
           }
         }
       };

@@ -47,6 +47,7 @@ namespace operation_data {
         if(request_age == OPERATION_DATA_REQUEST_TIMEOUT_CYCLES) {
           ESP_LOGW("MHI-AC-CTRL-Operation-Data", "Timeout when requesting Operation Data %s", this->name());
           request_age = 0xff;
+          this->has_value = false;
           return true;
         }
       }
