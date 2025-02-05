@@ -528,8 +528,10 @@ protected:
     const float minimum_temperature_ { 18.0f };
     const float maximum_temperature_ { 30.0f };
     // Although the hardware accepts temperatures in steps of 0.5, it
-    // effectively is per 1 degree:
+    // effectively is per 1 degree on most units:
     // https://github.com/absalom-muc/MHI-AC-Ctrl/issues/81
+    // But not all: https://github.com/hberntsen/mhi-ac-ctrl-esp32-c3/issues/14#issue-2828862442, so you an override it
+    // if needed in the esphome yaml
     const float temperature_step_ { 1.0f };
     const std::string custom_fan_ultra_low = std::string("Ultra Low");
 

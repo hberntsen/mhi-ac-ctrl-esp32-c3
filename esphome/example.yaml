@@ -38,6 +38,12 @@ climate:
     mhi_ac_ctrl_id: ${mhi_device_id}
     id: ${device_id}
     name: "${device_name}"
+    # For AC units that support .5 degree steps of the target temperature.
+    # Not sure? Try it and check whether the set_temperature sensor responds in 0.5 steps as well.
+    #visual:
+      #temperature_step:
+        #target_temperature: 0.5
+        #current_temperature: 0.25
 
 select:
   - platform: MhiAcCtrl
