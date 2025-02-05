@@ -157,7 +157,7 @@ namespace operation_data {
   DEFINE_OPERATION_DATA_CLASS(DischargePipeTemperature, 0x40, 0x85, uint8_t, float,
     mosi_frame[DB9] == 0x85 && (mosi_frame[DB6] & 0x80) == 0 && (mosi_frame[DB10] & 0x30) == 0x10,
     mosi_frame[DB11],
-    this->last_value < 0x2 ? 30 : this->last_value / 2.f * 32.f)
+    this->last_value < 0x12 ? 30 : this->last_value / 2.f + 32.f) // We cannot express <=30 in a float, so clamp to 30
 
   DEFINE_OPERATION_DATA_CLASS(Current, 0x40, 0x90, uint8_t, float,
     mosi_frame[DB9] == 0x90 && (mosi_frame[DB6] & 0x80) == 0 && (mosi_frame[DB10] & 0x30) == 0x10,
