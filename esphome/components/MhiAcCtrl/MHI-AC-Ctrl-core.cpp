@@ -71,7 +71,7 @@ static bool IRAM_ATTR gptimer_isr_callback(gptimer_handle_t timer, const gptimer
     gpio_set_level(gpio_cs_out, 1);
     gpio_set_level(gpio_cs_out, 0);
 
-    xTaskNotifyFromISR(mhi_poll_task_handle, 0, eNoAction, &xHigherPriorityTaskWoken);
+    vTaskNotifyGiveFromISR(mhi_poll_task_handle, &xHigherPriorityTaskWoken);
 
     return xHigherPriorityTaskWoken;
 }
@@ -471,7 +471,12 @@ static void mhi_poll_task(void *arg)
         // transaction mid-frame
         uint64_t current_timer_value;
         do {
-          xTaskNotifyWait(0, 0, NULL, portMAX_DELAY);
+          // Count missed frames as error in active mode
+          uint32_t missed_frames = ulTaskNotifyTake( pdTRUE, portMAX_DELAY) - 1;
+          if(active_mode && missed_frames) {
+            frame_errors += missed_frames;
+            ESP_LOGE(TAG, "Missed %u frames", missed_frames);
+          }
           ESP_ERROR_CHECK(gptimer_get_raw_count(cs_timer, &current_timer_value));
         } while(current_timer_value != 0);
         spi_slave_transmit(RCV_HOST, &spi_slave_trans, portMAX_DELAY);
