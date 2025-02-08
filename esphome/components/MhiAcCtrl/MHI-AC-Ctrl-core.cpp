@@ -28,7 +28,6 @@ using namespace mhi_ac::internal;
 gptimer_handle_t cs_timer = NULL;
 static TaskHandle_t mhi_poll_task_handle = NULL;
 
-static int ready = 0;
 static bool active_mode = false;
 static gpio_num_t gpio_cs_out;
 
@@ -43,14 +42,6 @@ Energy energy(230);
 SpiState spi_state;
 operation_data::State operation_data_state;
 
-enum class SPICycleState : unsigned {
-  START = 0, // Read out SpiState's changes and send to AC, set DB14
-  // State where DB14 is set and we keep sending the same changes
-  SET_LAST = 1, // Last cycle where we send our changes
-  // Between SET_LAST and including last is DB14 is unset
-  LAST = 3,
-};
-
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
   uint64_t current_timer_value;
@@ -62,24 +53,27 @@ static void IRAM_ATTR gpio_isr_handler(void* arg)
   ESP_ERROR_CHECK(gptimer_get_raw_count(cs_timer, &current_timer_value));
   if(current_timer_value == 0) {
     gptimer_start(cs_timer);
+  } else {
+    ESP_ERROR_CHECK(gptimer_set_raw_count(cs_timer, 0));
   }
 }
 
 static bool IRAM_ATTR gptimer_isr_callback(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata, void *user_ctx)
 {
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
     // Stop timer, gpio isr will turn it back on
     gptimer_stop(timer);
     // Set to 0 to tell the GPIO isr that the timer is not running
     gptimer_set_raw_count(cs_timer, 0);
 
-    // Trigger Chip Select
+    // Trigger Chip Select low->high->low
     gpio_set_level(gpio_cs_out, 1);
-    if(ready) {
-        spi_slave_transaction_t *t = (spi_slave_transaction_t *) user_ctx;
-        spi_slave_queue_trans(RCV_HOST, t, 0);
-    }
     gpio_set_level(gpio_cs_out, 0);
-    return false;
+
+    xTaskNotifyFromISR(mhi_poll_task_handle, 0, eNoAction, &xHigherPriorityTaskWoken);
+
+    return xHigherPriorityTaskWoken;
 }
 
 bool SpiState::snapshot_semaphore_take() {
@@ -390,19 +384,18 @@ static int validate_frame(std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame, u
 static void mhi_poll_task(void *arg)
 {
     esp_err_t err = 0;
-    unsigned cycle_state = 0;
+    bool double_frame = false;
 
     // use 2 recv buffers to be able to check for differences
     std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame_prev = recvbuf2;
     std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame = recvbuf;
 
     spi_slave_transaction_t spi_slave_trans;
-    spi_slave_transaction_t* spi_slave_trans_out;       // needed for spi_slave_get_trans_result which needs a pointer to a pointer
 
     gptimer_event_callbacks_t timer_callbacks = {
       .on_alarm = gptimer_isr_callback
     };
-    ESP_ERROR_CHECK(gptimer_register_event_callbacks(cs_timer, &timer_callbacks, &spi_slave_trans));
+    ESP_ERROR_CHECK(gptimer_register_event_callbacks(cs_timer, &timer_callbacks, NULL));
     ESP_ERROR_CHECK(gptimer_enable(cs_timer));
     // Set the count to 0, so the gpio ISR will start the timer
     ESP_ERROR_CHECK(gptimer_set_raw_count(cs_timer, 0));
@@ -422,18 +415,13 @@ static void mhi_poll_task(void *arg)
         }
         err = 0;
 
+        double_frame = !double_frame;
+
         if(!active_mode) {
           std::fill(sendbuf.begin(), sendbuf.end(), 0xff);
         } else {
-          if (cycle_state == static_cast<unsigned>(SPICycleState::START)
-              && xSemaphoreTake(spi_state.miso_semaphore_handle_, 0) == pdTRUE) {
-
+          if (double_frame && xSemaphoreTake(spi_state.miso_semaphore_handle_, 0) == pdTRUE) {
             std::copy(spi_state.miso_frame_.begin(), spi_state.miso_frame_.end(), sendbuf.begin());
-
-            operation_data_state.on_miso(sendbuf);
-
-            // DB14, to indicate we are setting things?
-            sendbuf[DB14] = 0x04;
 
             // we never change those, right?
             //sendbuf[DB10] = 0xff;
@@ -455,10 +443,9 @@ static void mhi_poll_task(void *arg)
             xSemaphoreGive(spi_state.miso_semaphore_handle_);
           }
 
-          if (cycle_state <= (unsigned)SPICycleState::SET_LAST) {
-            sendbuf[DB14] = 4;
-          } else {
-            sendbuf[DB14] = 0;
+          sendbuf[DB14] = double_frame ? 0x04 : 0;
+          if(double_frame) {
+            operation_data_state.on_miso(sendbuf);
           }
 
           // calculate checksum for the short frame
@@ -480,9 +467,14 @@ static void mhi_poll_task(void *arg)
         // Do an SPI transaction
         // blocking function waiting for the spi results. the hardware timer must reach 20ms and perform an spi transaction
         //  we can get the data directly from 'spi_slave_trans' instead of 'spi_slave_trans_out->'
-        ready = true;
-        err = spi_slave_get_trans_result(RCV_HOST, &spi_slave_trans_out, portMAX_DELAY);
-        ready = false;
+        // The GPIO CLK triggered timer alarm will clear right after a frame. Wait for it so we don't transmit the
+        // transaction mid-frame
+        uint64_t current_timer_value;
+        do {
+          xTaskNotifyWait(0, 0, NULL, portMAX_DELAY);
+          ESP_ERROR_CHECK(gptimer_get_raw_count(cs_timer, &current_timer_value));
+        } while(current_timer_value != 0);
+        spi_slave_transmit(RCV_HOST, &spi_slave_trans, portMAX_DELAY);
         if(err) {
             ESP_LOGE(TAG, "get_trans_result error: %i", err);
             continue;
@@ -498,12 +490,12 @@ static void mhi_poll_task(void *arg)
           spi_slave_trans.rx_buffer = &recvbuf;
         }
         // Transaction must be of a supported length
-        if(spi_slave_trans_out->trans_len != MHI_FRAME_LEN_LONG * 8
-            && spi_slave_trans_out->trans_len != MHI_FRAME_LEN_SHORT * 8) {
+        if(spi_slave_trans.trans_len != MHI_FRAME_LEN_LONG * 8
+            && spi_slave_trans.trans_len != MHI_FRAME_LEN_SHORT * 8) {
           err = true;
           continue;
         }
-        const size_t trans_len_bytes = spi_slave_trans_out->trans_len / 8;
+        const size_t trans_len_bytes = spi_slave_trans.trans_len / 8;
 
         // Validate SPI transaction
         err = validate_frame(mosi_frame, trans_len_bytes);
@@ -519,8 +511,8 @@ static void mhi_poll_task(void *arg)
           xSemaphoreGive(spi_state.snapshot_semaphore_handle_);
         }
 
-        // We get both last and first the same operation data. last is first so only use this one
-        if(cycle_state == static_cast<unsigned>(SPICycleState::LAST)) {
+        // We only seem get operation data when double_frame is false
+        if(!double_frame){
           // DB4 becomes 1 after a while when active mode is turned off, ignore that
           if(mosi_frame[DB4] > 0 && !(mosi_frame[DB4] == 1 && !active_mode)) {
             ESP_LOGW(TAG, "DB4 error %i", mosi_frame[DB4]);
@@ -534,12 +526,6 @@ static void mhi_poll_task(void *arg)
             float current = ((int)mosi_frame[DB11] * 14) / 51.0f;
             ESP_LOGD(TAG, "Current: %f, raw: %i, *230: %f", current, mosi_frame[DB11], current*230);
           }
-        }
-
-        if(cycle_state == static_cast<unsigned>(SPICycleState::LAST)) {
-          cycle_state = static_cast<unsigned>(SPICycleState::START);
-        } else {
-          cycle_state++;
         }
     }
 }
@@ -588,12 +574,16 @@ void init(const Config& config) {
     };
     ESP_ERROR_CHECK(gptimer_new_timer(&timer_config, &cs_timer));
     gptimer_alarm_config_t timer_alarm_config = {
-      // Configure the alarm value (in milliseconds) and the interrupt on alarm. there is a gap between each frame of 40ms.
-      // So we set the alarm to 20ms. once the alarm triggers, spi_slave_queue_trans is called which will get the data
-      // from the hardware spi. This is also the point to toggle the CS line to mark the end/start of a SPI
-      // transaction to the hardware, as it won't work without.
+      // Configure the alarm value (in milliseconds) and the interrupt on alarm. there is a gap between each frame of
+      // 40ms with short frames and about 33ms with long frames.
+      // We set the alarm to 1ms, so it is triggering after 1ms of no clock. We receive about 2 bytes per millisecond.
+      // This tolerance should be enough and will give us maximum time to process this frame and prepare the next.
       //
-      .alarm_count = 20 * (timer_config.resolution_hz / 1000),
+      // Once the alarm triggers, we toggle the CS line to mark the end/start of a SPI transaction to the hardware, as
+      // it won't work without. The GPIO interrupt below resets this timer every time the clock signal is low. When the
+      // SPI transaction is complete, the master leaves the clock pin high, setting of the alarm and us toggling the
+      // pin.
+      .alarm_count = 1 * (timer_config.resolution_hz / 1000),
       .reload_count = 0,
       .flags = {
         // We manually reload based on the clock signal we get from the AC
