@@ -463,12 +463,9 @@ static void mhi_poll_task(void *arg)
           sendbuf[CBL2] = tx_checksum;
         }
 
-
-        // Do an SPI transaction
-        // blocking function waiting for the spi results. the hardware timer must reach 20ms and perform an spi transaction
-        //  we can get the data directly from 'spi_slave_trans' instead of 'spi_slave_trans_out->'
         // The GPIO CLK triggered timer alarm will clear right after a frame. Wait for it so we don't transmit the
-        // transaction mid-frame
+        // transaction mid-frame. There is a very small chance that it will still happen in between the check here and
+        // the actual transaction starting.
         uint64_t current_timer_value;
         do {
           // Count missed frames as error in active mode
@@ -479,6 +476,7 @@ static void mhi_poll_task(void *arg)
           }
           ESP_ERROR_CHECK(gptimer_get_raw_count(cs_timer, &current_timer_value));
         } while(current_timer_value != 0);
+        // We're ready, wait on the SPI transaction to happen
         spi_slave_transmit(RCV_HOST, &spi_slave_trans, portMAX_DELAY);
         if(err) {
             ESP_LOGE(TAG, "get_trans_result error: %i", err);
