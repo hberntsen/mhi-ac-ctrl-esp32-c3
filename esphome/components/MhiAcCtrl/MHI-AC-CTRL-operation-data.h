@@ -210,26 +210,28 @@ namespace operation_data {
     std::array<OperationData*, 20> get_all() {
       // Not all OperationData is equally fast to retrieve. Interleave slow and instant ones, might help?
       return {
-        &this->current_,
-        &this->set_temperature_,
-        &this->compressor_protection_state_number_, /// 7 cycles
-        &this->return_air_temperature_,
+        &this->current_, // instant
+        &this->set_temperature_, // instant
+        &this->compressor_protection_state_number_, /// 16 times no match on
+                                                    /// single, 26 on split
+        &this->return_air_temperature_, // instant
         &this->indoor_u_bend_temperature_,
         &this->indoor_capillary_temperature_,
-        &this->compressor_total_run_hours_, /// 14 cycles
+        &this->compressor_total_run_hours_, /// 38 times no match on single,
+                                            /// 17 on split
         &this->indoor_suction_header_temperature_,
-        &this->indoor_fan_speed_,
-        &this->indoor_total_run_hours_,
-        &this->current_, /// Listed more so we can request it more often for higher update freqency
-        &this->outdoor_fan_speed_, /// 19 cycles
-        &this->outdoor_air_temperature_,
-        &this->outdoor_heat_exchanger_temperature_1_,
-        &this->compressor_frequency_,
-        &this->defrosting_, /// 9 cycles
+        &this->indoor_fan_speed_, // instant
+        &this->indoor_total_run_hours_, // instant
+        &this->current_, // Listed more often for higher update freqency
+        &this->outdoor_fan_speed_, // 16 times no match on single, 26 on split
+        &this->outdoor_air_temperature_, // instant
+        &this->outdoor_heat_exchanger_temperature_1_, // instant
+        &this->compressor_frequency_, //instant
+        &this->defrosting_, /// 17 times no match on single, 15 on split
         &this->discharge_pipe_temperature_,
-        &this->compressor_discharge_pipe_super_heat_temperature_,//22
-        &this->outdoor_expansion_valve_pulse_rate_, // 4 - 19 cycles
-        &this->energy_used_
+        &this->compressor_discharge_pipe_super_heat_temperature_,
+        &this->outdoor_expansion_valve_pulse_rate_,
+        &this->energy_used_ // instant
       };
     }
 
