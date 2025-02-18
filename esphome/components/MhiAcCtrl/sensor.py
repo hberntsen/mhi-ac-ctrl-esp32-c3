@@ -24,7 +24,8 @@ from esphome.const import (
     DEVICE_CLASS_CURRENT,
     UNIT_AMPERE,
     UNIT_KILOWATT_HOURS,
-    DEVICE_CLASS_ENERGY
+    DEVICE_CLASS_ENERGY,
+    ICON_COUNTER
 )
 from . import MhiAcCtrl, CONF_MHI_AC_CTRL_ID
 
@@ -106,10 +107,12 @@ CONFIG_SCHEMA = cv.All(
             ),
             cv.Optional(CONF_FRAME_ERRORS): sensor.sensor_schema(
                 class_=MhiFrameErrors,
+                icon=ICON_COUNTER,
                 state_class=STATE_CLASS_TOTAL_INCREASING,
                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC
             ),
             cv.Optional(CONF_OPERATION_DATA_TIMEOUTS): sensor.sensor_schema(
+                icon=ICON_COUNTER,
                 state_class=STATE_CLASS_TOTAL_INCREASING,
                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC
             ),
