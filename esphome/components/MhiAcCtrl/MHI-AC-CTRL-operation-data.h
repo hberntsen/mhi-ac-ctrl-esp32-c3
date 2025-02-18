@@ -216,8 +216,8 @@ namespace operation_data {
                                                     /// single, 26 on split
         &this->current_, // Listed more often for higher update freqency
         &this->return_air_temperature_, // instant
-        &this->indoor_u_bend_temperature_,
-        &this->indoor_capillary_temperature_,
+        &this->indoor_u_bend_temperature_, //instant
+        &this->indoor_capillary_temperature_, //instant
         &this->compressor_total_run_hours_, /// 38 times no match on single,
                                             /// 17 on split
         &this->indoor_suction_header_temperature_,
@@ -230,9 +230,9 @@ namespace operation_data {
         &this->compressor_frequency_, //instant
         &this->current_, // Listed more so we can request it more often for higher update freqency
         &this->defrosting_, /// 17 times no match on single, 15 on split
-        &this->discharge_pipe_temperature_,
-        &this->compressor_discharge_pipe_super_heat_temperature_,
-        &this->outdoor_expansion_valve_pulse_rate_,
+        &this->discharge_pipe_temperature_, // instant
+        &this->compressor_discharge_pipe_super_heat_temperature_, // 18 times no match
+        &this->outdoor_expansion_valve_pulse_rate_, // 39 times no match
         &this->energy_used_ // instant
       };
     }
