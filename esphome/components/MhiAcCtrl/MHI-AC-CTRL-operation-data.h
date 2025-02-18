@@ -207,13 +207,14 @@ namespace operation_data {
       xSemaphoreGive(this->value_semaphore_handle_);
     }
 
-    std::array<OperationData*, 20> get_all() {
+    std::array<OperationData*, 22> get_all() {
       // Not all OperationData is equally fast to retrieve. Interleave slow and instant ones, might help?
       return {
         &this->current_, // instant
         &this->set_temperature_, // instant
         &this->compressor_protection_state_number_, /// 16 times no match on
                                                     /// single, 26 on split
+        &this->current_, // Listed more often for higher update freqency
         &this->return_air_temperature_, // instant
         &this->indoor_u_bend_temperature_,
         &this->indoor_capillary_temperature_,
@@ -227,6 +228,7 @@ namespace operation_data {
         &this->outdoor_air_temperature_, // instant
         &this->outdoor_heat_exchanger_temperature_1_, // instant
         &this->compressor_frequency_, //instant
+        &this->current_, // Listed more so we can request it more often for higher update freqency
         &this->defrosting_, /// 17 times no match on single, 15 on split
         &this->discharge_pipe_temperature_,
         &this->compressor_discharge_pipe_super_heat_temperature_,
