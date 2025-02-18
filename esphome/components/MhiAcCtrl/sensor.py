@@ -31,6 +31,7 @@ from . import MhiAcCtrl, CONF_MHI_AC_CTRL_ID
 
 CONF_FRAME_ERRORS = "frame_errors"
 CONF_OPERATION_DATA_TIMEOUTS = "operation_data_timeouts"
+CONF_OPERATION_DATA_VISIBLE_TIMEOUTS = "operation_data_visible_timeouts"
 CONF_INTEGRATED_TOTAL_ENERGY = "integrated_total_energy"
 CONF_SET_TEMPERATURE = "set_temperature"
 CONF_CLIMATE_CURRENT_TEMPERATURE = "climate_current_temperature"
@@ -58,6 +59,7 @@ TYPES = [
     CONF_POWER,
     CONF_FRAME_ERRORS,
     CONF_OPERATION_DATA_TIMEOUTS,
+    CONF_OPERATION_DATA_VISIBLE_TIMEOUTS,
     CONF_CLIMATE_CURRENT_TEMPERATURE,
     CONF_RETURN_AIR_TEMPERATURE,
     CONF_INDOOR_U_BEND_TEMPERATURE,
@@ -112,6 +114,11 @@ CONFIG_SCHEMA = cv.All(
                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC
             ),
             cv.Optional(CONF_OPERATION_DATA_TIMEOUTS): sensor.sensor_schema(
+                icon=ICON_COUNTER,
+                state_class=STATE_CLASS_TOTAL_INCREASING,
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC
+            ),
+            cv.Optional(CONF_OPERATION_DATA_VISIBLE_TIMEOUTS): sensor.sensor_schema(
                 icon=ICON_COUNTER,
                 state_class=STATE_CLASS_TOTAL_INCREASING,
                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC

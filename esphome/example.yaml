@@ -88,10 +88,16 @@ sensor:
 
     # Data is requested sensor by sensor (when present) from the AC, which
     # should always answer, but might not. The timeout sensor counts how many
-    # requests were not answered. It is curerntly normal to have like 150 or so
-    # per day.
+    # requests were not answered. It is normal to have up to thousands per day
     operation_data_timeouts:
       name: ${device_name} operation data timeouts
+
+    # When operation data is more than a minute old, we set it to unknown,
+    # which makes a timeout in the operation data visible. This counts how
+    # often this happens. Usually, when a normal operation data timeout occurs,
+    # we re-request it and that should work, preventing a visible timeout.
+    operation_data_visible_timeouts:
+      name: ${device_name} operation data visible timeouts
 
     # In steps of 14/51A
     current:

@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <array>
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
@@ -35,31 +36,15 @@ namespace operation_data {
     /// When matched, store the updated value
     virtual void update(const std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame) = 0;
 
-    bool is_requested() const {
-      return this->request_age != 0xff;
-    }
-
-    /// Returns true when timed out
-    bool increment_age() {
-      if(request_age < 0xff) {
-        request_age++;
-
-        if(request_age == OPERATION_DATA_REQUEST_TIMEOUT_CYCLES) {
-          ESP_LOGW("MHI-AC-CTRL-Operation-Data", "Timeout when requesting Operation Data %s", this->name());
-          request_age = 0xff;
-          this->has_value = false;
-          return true;
-        }
-      }
-      return false;
+    bool has_value() const {
+      return this->age != -1;
     }
 
     bool enabled = false;
-    bool has_value = false;
+    /// Age in terms of esp_timer_get_time() time. -1 for no value yet
+    int64_t age = -1;
   protected:
     OperationData() {}
-    /// 0xff -> not requested. Else: frame cycle counter how old the request is
-    uint8_t request_age = 0xff;
   };
 
   template<uint8_t MISO_DB6, uint8_t MISO_DB9, typename Tinternal, typename Texternal>
@@ -69,7 +54,6 @@ namespace operation_data {
     void request(std::array<uint8_t, MHI_FRAME_LEN_LONG>& miso_frame) override {
       miso_frame[DB6] = MISO_DB6;
       miso_frame[DB9] = MISO_DB9;
-      request_age = 0;
     }
 
     bool was_changed() const {
@@ -88,13 +72,13 @@ namespace operation_data {
 
     /// Called when the request was answered
     void set_internal(Tinternal new_value) {
-      ESP_LOGD("MHI-AC-CTRL-Operation-Data", "Operdata %s request fulfilled after %u", this->name(), this->request_age);
-      this->request_age = 0xff;
-      if(new_value != last_value || !this->has_value) {
-        this->has_value = true;
+      int64_t new_age = esp_timer_get_time();
+      ESP_LOGD("MHI-AC-CTRL-Operation-Data", "Operdata %s request fulfilled after %u", this->name(), new_age - this->age);
+      if(new_value != last_value || !this->has_value()) {
         this->changed = true;
         this->last_value = new_value;
       }
+      this->age = new_age;
     }
 
     bool changed;
@@ -237,6 +221,31 @@ namespace operation_data {
       };
     }
 
+    std::array<OperationData*, 19> get_all_unique() {
+      return {
+        &this->current_,
+        &this->set_temperature_,
+        &this->compressor_protection_state_number_,
+        &this->return_air_temperature_,
+        &this->indoor_u_bend_temperature_,
+        &this->indoor_capillary_temperature_,
+        &this->compressor_total_run_hours_,
+        &this->indoor_suction_header_temperature_,
+        &this->indoor_fan_speed_,
+        &this->indoor_total_run_hours_,
+        &this->outdoor_fan_speed_,
+        &this->outdoor_air_temperature_,
+        &this->outdoor_heat_exchanger_temperature_1_,
+        &this->compressor_frequency_,
+        &this->defrosting_,
+        &this->discharge_pipe_temperature_,
+        &this->compressor_discharge_pipe_super_heat_temperature_,
+        &this->outdoor_expansion_valve_pulse_rate_,
+        &this->energy_used_
+      };
+    }
+
+
     bool value_semaphore_take() {
       return xSemaphoreTake(this->value_semaphore_handle_, 0) == pdTRUE;
     }
@@ -251,34 +260,28 @@ namespace operation_data {
       miso_frame[DB9] = 0xff;
 
       auto all = this->get_all();
-      unsigned active_requests = 0;
 
-      for(auto operation_data: all) {
-        if(operation_data->increment_age()) {
-          this->timeouts++;
-        }
-        if(operation_data->enabled && operation_data->is_requested()) {
-          active_requests++;
-        }
+      this->request_cycles++;
+      if(this->request_cycles >= OPERATION_DATA_REQUEST_TIMEOUT_CYCLES) {
+        this->request_next = true;
+        this->timeouts++;
+        ESP_LOGW("MHI-AC-CTRL-Operation-Data", "Timeout when requesting Operation Data %s", all[this->cycle_index]->name());
       }
 
-      // With set to "<1" and all OperationData enabled, we get a current reading every 15 seconds
-      // With set to "<2", this is every 10 seconds. But: after a day or so, requests are answered but their value stays
-      // the same
-      // With set to "<3", this is a few seconds quicker but we also start getting timeouts on stuff
-      if(active_requests < 1) {
+      if(this->request_next) {
+        // Jump to the next enabled index after the current one
         for(unsigned i = 0; i < all.size(); i++) {
-          auto x = all[(i + this->cycle_index) % all.size()];
-
-          if(x->enabled && !x->is_requested()) {
+          auto all_index = (i + this->cycle_index + 1) % all.size();
+          auto x = all[all_index];
+          if(x->enabled) {
             x->request(miso_frame);
-            this->cycle_index = (i + this->cycle_index + 1) % all.size();
-            ESP_LOGD("MHI-AC-CTRL-Operation-Data", "Requested %s, Active requests=%u", x->name(), active_requests+1);
+            this->cycle_index = all_index;
+            this->request_cycles = 0;
+            ESP_LOGD("MHI-AC-CTRL-Operation-Data", "Requested %s", x->name());
             break;
-          } else {
-            ESP_LOGD("MHI-AC-CTRL-Operation-Data", "%s, enabled %i, requested %i", x->name(), x->enabled, x->is_requested());
           }
         }
+        this->request_next = false;
       }
     }
 
@@ -288,10 +291,13 @@ namespace operation_data {
       }
 
       bool match_found = false;
-      for(auto x: this->get_all()) {
+      for(auto x: this->get_all_unique()) {
         if(x->matches(mosi_frame)) {
+          ESP_LOGD("MHI-AC-CTRL-Operation-Data", "Got: %s", x->name());
           x->update(mosi_frame);
           match_found = true;
+          // Assumes we received the thing we requested an only one thing per request
+          this->request_next = true;
           break;
         }
       }
@@ -303,6 +309,8 @@ namespace operation_data {
           ESP_LOGW("MHI-AC-CTRL-Operation-Data", "Count of following error operation data: %u", mosi_frame[DB11] + 4);
         } else if (mosi_frame[DB9] != 0xff) {
           ESP_LOGW("MHI-AC-CTRL-Operation-Data", "Error: Unknown opdata: %02x %02x %02x", mosi_frame[DB9], mosi_frame[DB6], mosi_frame[DB10]);
+        } else {
+          ESP_LOGD("MHI-AC-CTRL-Operation-Data", "Got: nothing");
         }
       }
 
@@ -332,8 +340,12 @@ namespace operation_data {
     uint32_t timeouts = 0;
 
   protected:
-    /// The index of the next operation data to try to request
+    /// The index of the current operation data we requested
     unsigned cycle_index = 0;
+    /// Whether to go to the next operation data in the next on_miso
+    bool request_next = true;
+    /// How many on_miso cycles we are busy with a request
+    uint8_t request_cycles = 0;
 
     /// Semaphore to lock updating the values of the operation data
     SemaphoreHandle_t value_semaphore_handle_;

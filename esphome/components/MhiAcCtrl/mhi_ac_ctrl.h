@@ -230,6 +230,9 @@ public:
 
     void setup() override
     {
+        if(this->operation_data_visible_timeouts_sensor_) {
+          this->operation_data_visible_timeouts_sensor_->publish_state(0);
+        }
         mhi_ac::init(this->ac_config_);
 
         constexpr auto opdatas = &mhi_ac::operation_data_state;
@@ -401,21 +404,43 @@ protected:
         this->operation_data_timeouts_sensor_->publish_state(opdatas->timeouts);
       }
 
-      auto update_sensor = [first_time](auto* sensor, auto operation_data) {
+      int64_t current_time = esp_timer_get_time();
+      // One minute after which we set values to NaN. Should be plenty
+      const int64_t expiry_time = current_time - (1e6 * 60);
+
+      auto update_sensor = [first_time, expiry_time, this](Sensor* sensor, auto operation_data) {
         if(sensor) {
-          if(operation_data->has_value && (operation_data->was_changed() || first_time)) {
-            sensor->publish_state(operation_data->get_reset_changed());
-          } else if(!operation_data->has_value) {
-            // The boolean defrost sensor does not have get_raw_state and cannot be set to NAN to indicate we don't have
-            // a proper value
-            if constexpr (requires { sensor->get_raw_state(); }) {
-              if(!std::isnan(sensor->get_raw_state())) {
-                sensor->publish_state(NAN);
+          bool timed_out = operation_data->age < expiry_time;
+          bool sensor_has_value = !first_time && !std::isnan(sensor->get_raw_state());
+
+          if(timed_out || !operation_data->has_value()) {
+            if(sensor_has_value) {
+              sensor->publish_state(NAN);
+              // Log this transition to NAN as a visible timeout
+              if(timed_out && this->operation_data_visible_timeouts_sensor_) {
+                auto visible_timeouts_sensor = this->operation_data_visible_timeouts_sensor_;
+                visible_timeouts_sensor->publish_state(visible_timeouts_sensor->get_raw_state()+1);
               }
             }
+          } else if(operation_data->was_changed() || !sensor_has_value) {
+            // has_value() is true and we assume the value is not NAN
+            sensor->publish_state(operation_data->get_reset_changed());
           }
         }
       };
+
+#ifdef USE_BINARY_SENSOR
+      auto update_binary_sensor = [first_time](binary_sensor::BinarySensor* sensor, auto operation_data) {
+        // A boolean sensor does not have get_raw_state and cannot be set to NAN to indicate we don't have a proper
+        // value
+        if(sensor) {
+          bool sensor_has_value = !first_time;
+          if(operation_data->has_value() && (operation_data->was_changed() || !sensor_has_value)) {
+            sensor->publish_state(operation_data->get_reset_changed());
+          }
+        }
+      };
+#endif
 
       update_sensor(this->set_temperature_sensor_, &opdatas->set_temperature_);
       update_sensor(this->return_air_temperature_sensor_, &opdatas->return_air_temperature_);
@@ -436,7 +461,7 @@ protected:
       update_sensor(this->outdoor_expansion_valve_pulse_rate_sensor_, &opdatas->outdoor_expansion_valve_pulse_rate_);
       update_sensor(this->energy_used_sensor_, &opdatas->energy_used_);
 #ifdef USE_BINARY_SENSOR
-      update_sensor(this->defrosting_binary_sensor_, &opdatas->defrosting_);
+      update_binary_sensor(this->defrosting_binary_sensor_, &opdatas->defrosting_);
 #endif
 
       opdatas->value_semaphore_give();
@@ -538,6 +563,7 @@ protected:
     SUB_SENSOR(climate_current_temperature)
 
     SUB_SENSOR(operation_data_timeouts)
+    SUB_SENSOR(operation_data_visible_timeouts)
     SUB_SENSOR(set_temperature)
     SUB_SENSOR(return_air_temperature)
     SUB_SENSOR(indoor_u_bend_temperature)
