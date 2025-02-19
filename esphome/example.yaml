@@ -105,7 +105,11 @@ sensor:
 
     # Using the current from the operation data, multiplied by 230V, or the
     # value set using from, i.e. a home assistant voltage sensor. See later in
-    # this file.
+    # this file. Note that this is technically not watts but VA. Though in
+    # practice, the AC has a power factor of 1 when active. Except for the
+    # lowest power around 280W, then the power factor is around 0.78 on my
+    # multi-split. This is quite rough anyway due to the step size of the
+    # current sensor.
     power:
       name: ${device_name} power
     # Integrates the power sensor above into energy usage, as an alternative to
@@ -113,7 +117,8 @@ sensor:
     # the less accurate it seems compared to an external power meter (like, the
     # actual usage can be a factor of 1.6 times higher). It can also be on-par
     # whith less heavy load.
-    # Not sure yet which is more accurate.
+    # Not sure yet which is more accurate. See the discussion here:
+    # https://gathering.tweakers.net/forum/list_message/81683330#81683330
     integrated_total_energy:
       name: ${device_name} energy
       filters:
