@@ -409,9 +409,6 @@ static void mhi_poll_task(void *arg)
         if (err) {
             ESP_LOGW(TAG, "error %i . trans len: %i", err, spi_slave_trans.trans_len);
             frame_errors++;
-
-            // wait a second before retrying communication
-            vTaskDelayMs(1000);
         }
         err = 0;
 
