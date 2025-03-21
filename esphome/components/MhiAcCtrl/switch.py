@@ -32,7 +32,8 @@ CONFIG_SCHEMA = cv.All(
 async def setup_conf(config, key, hub):
     if key in config:
         conf = config[key]
-        sens = await switch.new_switch(conf)
+        swi = await switch.new_switch(conf)
+        cg.add(getattr(hub, f"set_{key}_switch")(swi))
 
 
 async def to_code(config):

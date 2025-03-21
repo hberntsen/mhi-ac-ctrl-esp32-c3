@@ -90,6 +90,19 @@ protected:
 
 #ifdef USE_SWITCH
 class MhiActiveMode : public switch_::Switch {
+public:
+  void setup() {
+    ESP_LOGCONFIG(TAG, "Setting up MHI Active Mode Switch '%s'...", this->name_.c_str());
+
+    bool initial_state = this->get_initial_state_with_restore_mode().value_or(false);
+
+    if (initial_state) {
+      this->turn_on();
+    } else {
+      this->turn_off();
+    }
+  }
+
 protected:
     virtual void write_state(bool state) {
         mhi_ac::active_mode_set(state);
@@ -256,6 +269,11 @@ public:
         opdatas->energy_used_.enabled = this->energy_used_sensor_;
 #ifdef USE_BINARY_SENSOR
         opdatas->defrosting_.enabled = this->defrosting_binary_sensor_;
+#endif
+#ifdef USE_SWITCH
+        if(this->active_mode_switch_) {
+          this->active_mode_switch_->setup();
+        }
 #endif
     }
 
@@ -595,6 +613,9 @@ protected:
     MhiIntegratedTotalEnergy *integrated_total_energy_sensor_ = nullptr;
     MhiPower *power_sensor_ = nullptr;
     mhi_ac::Config ac_config_;
+#ifdef USE_SWITCH
+    MhiActiveMode *active_mode_switch_ = nullptr;
+#endif
 
 public:
 #ifdef USE_SELECT
@@ -618,6 +639,11 @@ public:
     void set_power_sensor(MhiPower *sensor) {
         this->power_sensor_ = sensor;
     }
+#ifdef USE_SWITCH
+    void set_active_mode_switch(MhiActiveMode *swi) {
+      this->active_mode_switch_ = swi;
+    }
+#endif
 
 
 };
