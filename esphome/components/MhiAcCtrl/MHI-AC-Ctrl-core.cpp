@@ -474,7 +474,7 @@ static void mhi_poll_task(void *arg)
           ESP_ERROR_CHECK(gptimer_get_raw_count(cs_timer, &current_timer_value));
         } while(current_timer_value != 0);
         // We're ready, wait on the SPI transaction to happen
-        spi_slave_transmit(RCV_HOST, &spi_slave_trans, pdMS_TO_TICKS(10000));
+        err = spi_slave_transmit(RCV_HOST, &spi_slave_trans, pdMS_TO_TICKS(10000));
         if(err) {
           if(err == ESP_ERR_TIMEOUT) {
             ESP_LOGE(TAG, "SPI transaction timeout. Is sclk_pin connected?");
