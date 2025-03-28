@@ -530,7 +530,22 @@ static void mhi_poll_task(void *arg)
     }
 }
 
-void init(const Config& config) {
+/**
+ * Checks whether the GPIO CS loopback works by toggling it a few times.
+ */
+static bool check_gpio_cs_loopback(gpio_num_t cs_in_pin) {
+  int on = 0;
+  for(int i = 0; i < 42; i++) {
+    gpio_set_level(gpio_cs_out, on);
+    if(gpio_get_level(cs_in_pin) != on) {
+      return false;
+    }
+    on ^= 1;
+  }
+  return true;
+}
+
+InitError init(const Config& config) {
     esp_err_t err;
 
     gpio_cs_out = static_cast<gpio_num_t>(config.cs_out_pin);
@@ -616,6 +631,10 @@ io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
     gpio_config(&io_conf);
 
+    if(!check_gpio_cs_loopback(static_cast<gpio_num_t>(config.cs_in_pin))) {
+      return InitError::CSLoopbackFail;
+    }
+
     gpio_set_level(gpio_cs_out, 1);
 
     xTaskCreatePinnedToCore(
@@ -627,5 +646,6 @@ io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
                         &mhi_poll_task_handle,  // Task handle.
                         1);                     // Core where the task should run
 
+    return InitError::Ok;
 }
 } //namespace mhi_ac

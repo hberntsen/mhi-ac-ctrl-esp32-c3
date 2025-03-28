@@ -246,7 +246,12 @@ public:
         if(this->operation_data_visible_timeouts_sensor_) {
           this->operation_data_visible_timeouts_sensor_->publish_state(0);
         }
-        mhi_ac::init(this->ac_config_);
+        mhi_ac::InitError err = mhi_ac::init(this->ac_config_);
+        switch(err) {
+          case mhi_ac::InitError::CSLoopbackFail:
+            this->status_set_error("CS loopback check failed. Are cs_in_pin and cs_out_pin connected with each other?");
+            return;
+        }
 
         constexpr auto opdatas = &mhi_ac::operation_data_state;
         opdatas->set_temperature_.enabled = this->set_temperature_sensor_;

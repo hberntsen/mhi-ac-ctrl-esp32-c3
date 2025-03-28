@@ -78,9 +78,13 @@ enum class ACVanesLR {
   Left = 0, LeftCenter = 1, Center = 2, CenterRight = 3, Right = 4, Wide = 5, Spot = 6, Swing = 8
 };
 
+enum class InitError {
+  Ok = 0,
+  CSLoopbackFail
+};
 
 
-void init(const Config& config);
+InitError init(const Config& config);
 
 void active_mode_set(bool state);
 bool active_mode_get();
