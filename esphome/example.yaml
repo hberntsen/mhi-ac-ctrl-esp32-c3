@@ -88,7 +88,8 @@ sensor:
 
     # Data is requested sensor by sensor (when present) from the AC, which
     # should always answer, but might not. The timeout sensor counts how many
-    # requests were not answered. It is normal to have up to thousands per day
+    # requests were not answered. It is normal to have up to thousands per day,
+    # therefore the sensor is not that useful to include in your yaml.
     operation_data_timeouts:
       name: ${device_name} operation data timeouts
 
