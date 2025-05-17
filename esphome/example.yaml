@@ -92,6 +92,8 @@ sensor:
     # therefore the sensor is not that useful to include in your yaml.
     operation_data_timeouts:
       name: ${device_name} operation data timeouts
+      filters:
+        - throttle: 1min
 
     # When operation data is more than a minute old, we set it to unknown,
     # which makes a timeout in the operation data visible. This counts how
