@@ -4,12 +4,15 @@ from esphome.components import climate
 from esphome.core import coroutine
 from . import MhiAcCtrl, CONF_MHI_AC_CTRL_ID
 
-CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
-    {
-        cv.GenerateID(): cv.declare_id(MhiAcCtrl),
-        cv.GenerateID(CONF_MHI_AC_CTRL_ID): cv.use_id(MhiAcCtrl),
-    }
-).extend(cv.COMPONENT_SCHEMA)
+CONFIG_SCHEMA = (
+    climate.climate_schema(MhiAcCtrl)
+    .extend(
+        {
+            cv.GenerateID(CONF_MHI_AC_CTRL_ID): cv.use_id(MhiAcCtrl),
+        }
+    )
+    .extend(cv.COMPONENT_SCHEMA)
+)
 
 
 @coroutine
