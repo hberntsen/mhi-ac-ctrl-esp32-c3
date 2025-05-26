@@ -265,7 +265,7 @@ namespace operation_data {
       if(this->request_cycles >= OPERATION_DATA_REQUEST_TIMEOUT_CYCLES) {
         this->request_next = true;
         this->timeouts++;
-        ESP_LOGW("MHI-AC-CTRL-Operation-Data", "Timeout when requesting Operation Data %s", all[this->cycle_index]->name());
+        ESP_LOGI("MHI-AC-CTRL-Operation-Data", "Timeout when requesting Operation Data %s", all[this->cycle_index]->name());
       }
 
       if(this->request_next) {
