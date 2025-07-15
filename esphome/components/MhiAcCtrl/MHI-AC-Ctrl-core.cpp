@@ -24,8 +24,11 @@ using namespace mhi_ac::internal;
 #define vTaskDelayMs(ms)            vTaskDelay((ms)/portTICK_PERIOD_MS)
 
 #define ESP_INTR_FLAG_DEFAULT       0                                           // default to allocating a non-shared interrupt of level 1, 2 or 3.
+#define STACK_SIZE 16384
 
 gptimer_handle_t cs_timer = NULL;
+static StaticTask_t xTaskBuffer;
+static StackType_t xStack[ STACK_SIZE ];
 static TaskHandle_t mhi_poll_task_handle = NULL;
 
 static bool active_mode = false;
@@ -641,14 +644,7 @@ io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
 
     gpio_set_level(gpio_cs_out, 1);
 
-    xTaskCreatePinnedToCore(
-                        mhi_poll_task,          // Function to implement the task
-                        "mhi_task",             // Name of the task
-                        4096,                   // Stack size in words
-                        NULL,                   // Task input parameter
-                        10,                     // Priority of the task
-                        &mhi_poll_task_handle,  // Task handle.
-                        1);                     // Core where the task should run
+    mhi_poll_task_handle = xTaskCreateStatic(mhi_poll_task, "mhi_task", STACK_SIZE, NULL, 10, xStack, &xTaskBuffer);
 
     return InitError::Ok;
 }
