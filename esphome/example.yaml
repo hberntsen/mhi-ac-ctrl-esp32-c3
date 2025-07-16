@@ -12,6 +12,8 @@ esphome:
 
 external_components:
   - source: components
+# Or, directly refer to the Git repository
+#  - source: github://hberntsen/mhi-ac-ctrl-esp32-c3@master
 
 esp32:
   board: esp32-c3-devkitm-1
