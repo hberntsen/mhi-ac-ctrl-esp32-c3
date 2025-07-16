@@ -13,7 +13,7 @@ This code is inspired by [@absalom-muc's MHI-AC-Ctrl](https://github.com/absalom
   * SRK25ZS-W
 
 ### Community supported:
-* Other ESP32-C3 boards (e.g., [ESP32-C3 super mini](https://github.com/xangin/mhi-ac-ctrl-esp32-c3/blob/master/Hardware.md).
+* Other ESP32-C3 boards (e.g. [ESP32-C3 super mini](https://github.com/xangin/mhi-ac-ctrl-esp32-c3/blob/master/Hardware.md)).
   Note that the hardware SPI used in this project needs a GPIO loopback for the chip select. Connect two free GPIOs for that, like IO9 and IO10 in the [schematic](images/MHI-AC-Ctrl_Schematic.png).
 * The ESP32 [has been reported to work](https://github.com/hberntsen/mhi-ac-ctrl-esp32-c3/issues/12#issuecomment-2594627493). Make sure you use the right pins, as discussed in [#11](https://github.com/hberntsen/mhi-ac-ctrl-esp32-c3/issues/11).
 * Te AC units listed at https://github.com/absalom-muc/MHI-AC-Ctrl?tab=readme-ov-file#prerequisites should work. Some older units have to use the `use_long_frame: false` setting.
