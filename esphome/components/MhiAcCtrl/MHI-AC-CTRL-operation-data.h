@@ -102,10 +102,14 @@ namespace operation_data {
     this->last_value * 0.327f - 11.4f) // only rough approximation
 
   /// a.k.a THI-R2
-  DEFINE_OPERATION_DATA_CLASS(IndoorCapillaryTemperature, 0x40, 0x81, uint8_t, uint8_t,
+  ///
+  /// Value uses renewed calculation of 2025-07-08, calculation needs to be confirmed.
+  /// Calculation from https://github.com/ginkage/MHI-AC-Ctrl-ESPHome/pull/159
+  /// Also see https://github.com/ginkage/MHI-AC-Ctrl-ESPHome/issues/145#issuecomment-3078841631
+  DEFINE_OPERATION_DATA_CLASS(IndoorCapillaryTemperature, 0x40, 0x81, uint8_t, float,
     mosi_frame[DB9] == 0x81 && (mosi_frame[DB6] & 0x80) == 0 && (mosi_frame[DB10] & 0x30) == 0x10,
     mosi_frame[DB11],
-    this->last_value) // formula for calculation not known
+    0.275f * this->last_value - 47.0f)
 
   /// a.k.a THI-R3
   DEFINE_OPERATION_DATA_CLASS(IndoorSuctionHeaderTemperature, 0xc0, 0x87, uint8_t, float,

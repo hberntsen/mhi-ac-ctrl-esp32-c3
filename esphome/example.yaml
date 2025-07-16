@@ -170,6 +170,9 @@ sensor:
     # Calculation marked as 'to be confirmed' in mhi-ac-ctrl
     compressor_frequency:
       name: ${device_name} compressor frequency
+    # See https://github.com/ginkage/MHI-AC-Ctrl-ESPHome/issues/145#issuecomment-3078841631
+    indoor_capillary_temperature:
+      name: ${device_name} indoor capillary temperature
 
     # These two are marked as only a rough apprximation in mhi-ac-ctrl
     indoor_u_bend_temperature:
@@ -178,8 +181,6 @@ sensor:
       name: ${device_name} indoor suction header temperature
 
     # Formula for calculation not known for the following sensors:
-    indoor_capillary_temperature:
-      name: ${device_name} indoor capillary temperature
     outdoor_heat_exchanger_temperature_1:
       name: ${device_name} outdoor heat exchanger temperature 1
     compressor_discharge_pipe_super_heat_temperature:
