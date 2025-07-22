@@ -7,6 +7,8 @@
 #include <string.h>
 #include <algorithm>
 #include <ranges>
+#include <iomanip>
+#include <sstream>
 
 #include "driver/gptimer.h"
 #include "driver/spi_slave.h"
@@ -44,6 +46,16 @@ namespace mhi_ac {
 Energy energy(230);
 SpiState spi_state;
 operation_data::State operation_data_state;
+
+
+static void print_frame(const std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame) {
+    std::ostringstream oss;
+    for (size_t i = 0; i < mosi_frame.size(); ++i) {
+        oss << "0x" << std::hex << std::uppercase << std::setw(2) << std::setfill('0')
+            << static_cast<int>(mosi_frame[i]) << " ";
+    }
+    ESP_LOGW(TAG, "Frame: %s", oss.str().c_str());
+}
 
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
@@ -334,6 +346,7 @@ static int validate_frame_short(std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_fr
   if (! validate_signature(mosi_frame[SB0], mosi_frame[SB1], mosi_frame[SB2])) {
     ESP_LOGW(TAG, "wrong MOSI signature. 0x%02x 0x%02x 0x%02x",
                 mosi_frame[0], mosi_frame[1], mosi_frame[2]);
+    print_frame(mosi_frame);
 
     return -1;
   } else if ( (mosi_frame[CBH] != (rx_checksum>>8 & 0xff)) | (mosi_frame[CBL] != (rx_checksum & 0xff)) ) {
