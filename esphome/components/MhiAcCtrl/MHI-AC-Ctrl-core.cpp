@@ -26,7 +26,7 @@ using namespace mhi_ac::internal;
 #define vTaskDelayMs(ms)            vTaskDelay((ms)/portTICK_PERIOD_MS)
 
 #define ESP_INTR_FLAG_DEFAULT       0                                           // default to allocating a non-shared interrupt of level 1, 2 or 3.
-#define STACK_SIZE 2048
+#define STACK_SIZE 4096
 
 gptimer_handle_t cs_timer = NULL;
 static StaticTask_t xTaskBuffer;
