@@ -402,6 +402,9 @@ static void mhi_poll_task(void *arg)
     esp_err_t err = 0;
     bool double_frame = false;
 
+    recvbuf.fill(0);
+    recvbuf2.fill(0);
+
     // use 2 recv buffers to be able to check for differences
     std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame_prev = recvbuf2;
     std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame = recvbuf;
