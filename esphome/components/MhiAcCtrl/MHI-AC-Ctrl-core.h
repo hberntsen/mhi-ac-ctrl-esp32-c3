@@ -133,6 +133,8 @@ public:
   bool current_temperature_changed() const;
   float current_temperature_get() const;
 
+  void external_room_temperature_set(float value);
+
   bool compressor_changed() const;
   bool compressor_get() const;
 

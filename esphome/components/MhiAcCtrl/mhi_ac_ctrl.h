@@ -275,6 +275,13 @@ public:
 #ifdef USE_BINARY_SENSOR
         opdatas->defrosting_.enabled = this->defrosting_binary_sensor_;
 #endif
+
+        if (this->external_room_temperature_sensor_ != nullptr) {
+          this->external_room_temperature_sensor_->add_on_state_callback([](float state) {
+            mhi_ac::spi_state.external_room_temperature_set(state);
+          });
+        }
+
 #ifdef USE_SWITCH
         if(this->active_mode_switch_) {
           this->active_mode_switch_->setup();
@@ -608,6 +615,7 @@ protected:
 #ifdef USE_BINARY_SENSOR
     SUB_BINARY_SENSOR(defrosting)
 #endif
+    SUB_SENSOR(external_room_temperature)
 
 protected:
 #ifdef USE_SELECT

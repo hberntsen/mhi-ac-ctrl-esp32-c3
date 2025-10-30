@@ -218,6 +218,19 @@ float SpiState::current_temperature_get() const {
   return ((int)this->mosi_frame_snapshot_[DB3] - 61) / 4.0;
 }
 
+void SpiState::external_room_temperature_set(float value) {
+  xSemaphoreTake(this->miso_semaphore_handle_, portMAX_DELAY);
+  if(std::isnan(value)) {
+    this->miso_frame_[DB3] = 0xff;
+    ESP_LOGD(TAG, "Disabled external room temperature sensor");
+  } else {
+    uint8_t troom = (uint8_t)roundf(CLAMP(value * 4 + 61, 0, 0xfe));
+    this->miso_frame_[DB3] = troom;
+    ESP_LOGD(TAG, "Set external room temperature, new DB3: %x (from source temp %f)", this->miso_frame_[DB3], value);
+  }
+  xSemaphoreGive(this->miso_semaphore_handle_);
+}
+
 bool SpiState::compressor_changed() const{
   return (this->mosi_frame_snapshot_[DB13] & COMP_ACTIVE_MASK) != (this->mosi_frame_snapshot_prev_[DB13] & COMP_ACTIVE_MASK);
 }
