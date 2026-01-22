@@ -535,8 +535,8 @@ protected:
         }
 
         if (call.has_custom_fan_mode()) {
-          const char * fan_mode = call.get_custom_fan_mode();
-          if(std::strcmp(fan_mode, custom_fan_ultra_low) == 0) {
+          const esphome::StringRef fan_mode = call.get_custom_fan_mode();
+          if(fan_mode == custom_fan_ultra_low) {
             mhi_ac::spi_state.fan_set(mhi_ac::ACFan::speed_1);
           } else {
               ESP_LOGW(TAG, "Unsupported custom fan mode: %s", fan_mode);
