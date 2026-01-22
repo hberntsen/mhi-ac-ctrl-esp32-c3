@@ -249,7 +249,7 @@ public:
         mhi_ac::InitError err = mhi_ac::init(this->ac_config_);
         switch(err) {
           case mhi_ac::InitError::CSLoopbackFail:
-            this->status_set_error("CS loopback check failed. Are cs_in_pin and cs_out_pin connected with each other?");
+            this->status_set_error(LOG_STR("CS loopback check failed. Are cs_in_pin and cs_out_pin connected with each other?"));
             return;
         }
 
