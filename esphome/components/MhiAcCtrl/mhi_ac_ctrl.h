@@ -292,7 +292,7 @@ public:
     void loop() override {
         bool publish_self_state = false;
         if(!mhi_ac::spi_state.has_received_data()) {
-          this->status_set_warning("No MHI AC communication");
+          this->status_set_warning(LOG_STR("No MHI AC communication"));
           return;
         }
         this->status_clear_warning();
