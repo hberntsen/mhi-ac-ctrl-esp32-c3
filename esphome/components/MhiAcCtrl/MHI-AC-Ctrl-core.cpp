@@ -12,6 +12,8 @@
 #include "driver/spi_slave.h"
 #include "driver/gpio.h"
 
+//#undef LOG_LOCAL_LEVEL
+//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include "esp_log.h"
 
 #include "MHI-AC-CTRL-operation-data.h"
