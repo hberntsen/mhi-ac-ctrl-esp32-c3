@@ -17,6 +17,8 @@ external_components:
 
 esp32:
   board: esp32-c3-devkitm-1
+  # Run CPU at slower speed to save power
+  cpu_frequency: 80MHz
   framework:
     type: esp-idf
 
