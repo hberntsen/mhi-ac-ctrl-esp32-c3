@@ -498,8 +498,10 @@ static void mhi_poll_task(void *arg)
         err = spi_slave_transmit(RCV_HOST, &spi_slave_trans, pdMS_TO_TICKS(10000));
         if(err) {
           if(err == ESP_ERR_TIMEOUT) {
+            frame_errors++;
             ESP_LOGE(TAG, "SPI transaction timeout. Is sclk_pin connected?");
           } else {
+            frame_errors++;
             ESP_LOGE(TAG, "get_trans_result error: %i", err);
           }
           continue;
@@ -525,6 +527,7 @@ static void mhi_poll_task(void *arg)
         // Validate SPI transaction
         err = validate_frame(mosi_frame, trans_len_bytes);
         if(err != 0) {
+          frame_errors++;
           continue;
         }
 
