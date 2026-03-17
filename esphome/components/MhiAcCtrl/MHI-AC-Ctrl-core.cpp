@@ -486,11 +486,15 @@ static void mhi_poll_task(void *arg)
         // the actual transaction starting.
         uint64_t current_timer_value;
         do {
-          // Count missed frames as error in active mode
-          uint32_t missed_frames = ulTaskNotifyTake( pdTRUE, portMAX_DELAY) - 1;
-          if(active_mode && missed_frames) {
-            frame_errors += missed_frames;
-            ESP_LOGE(TAG, "Missed %u frames", missed_frames);
+          uint32_t frames_received = ulTaskNotifyTake( pdTRUE, pdMS_TO_TICKS(10000));
+          if(frames_received == 0) {
+            ESP_LOGE(TAG, "No SPI clock detected");
+            frame_errors += 1;
+            continue;
+          } else if(active_mode && frames_received > 1) {
+            // Add missed frames to frame_errors
+            frame_errors += frames_received - 1;
+            ESP_LOGE(TAG, "Missed %u frames", frames_received - 1);
           }
           ESP_ERROR_CHECK(gptimer_get_raw_count(cs_timer, &current_timer_value));
         } while(current_timer_value != 0);
@@ -499,7 +503,7 @@ static void mhi_poll_task(void *arg)
         if(err) {
           if(err == ESP_ERR_TIMEOUT) {
             frame_errors++;
-            ESP_LOGE(TAG, "SPI transaction timeout. Is sclk_pin connected?");
+            ESP_LOGE(TAG, "SPI transaction timeout.");
           } else {
             frame_errors++;
             ESP_LOGE(TAG, "get_trans_result error: %i", err);
