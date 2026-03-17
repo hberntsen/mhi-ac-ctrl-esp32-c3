@@ -291,6 +291,10 @@ public:
 
     void loop() override {
         bool publish_self_state = false;
+
+        if(frame_errors_sensor_)
+            frame_errors_sensor_->loop();
+
         if(!mhi_ac::spi_state.has_received_data()) {
           this->status_set_warning(LOG_STR("No MHI AC communication"));
           return;
@@ -305,8 +309,6 @@ public:
             integrated_total_energy_sensor_->loop();
         if(power_sensor_)
             power_sensor_->loop();
-        if(frame_errors_sensor_)
-            frame_errors_sensor_->loop();
 #ifdef USE_SELECT
         if(vanes_ud_select_)
             vanes_ud_select_->loop();
