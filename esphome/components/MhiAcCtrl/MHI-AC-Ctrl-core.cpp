@@ -7,6 +7,7 @@
 #include <string.h>
 #include <algorithm>
 #include <ranges>
+#include <span>
 
 #include "driver/gptimer.h"
 #include "driver/spi_slave.h"
@@ -36,13 +37,17 @@ static TaskHandle_t mhi_poll_task_handle = NULL;
 static bool active_mode = false;
 static gpio_num_t gpio_cs_out;
 
-static DMA_ATTR std::array<uint8_t, MHI_FRAME_LEN_LONG> sendbuf;
-static DMA_ATTR std::array<uint8_t, MHI_FRAME_LEN_LONG> recvbuf;
-static DMA_ATTR std::array<uint8_t, MHI_FRAME_LEN_LONG> recvbuf2;
+namespace mhi_ac {
+
+// Needs length that is a multiple of 4
+using spi_dma_buf_t = std::array<uint8_t, MHI_FRAME_LEN_LONG + 4 - (MHI_FRAME_LEN_LONG % 4)>;
+
+static DMA_ATTR spi_dma_buf_t sendbuf;
+static DMA_ATTR spi_dma_buf_t recvbuf;
+static DMA_ATTR spi_dma_buf_t recvbuf2;
 
 static uint32_t frame_errors = 0;
 
-namespace mhi_ac {
 Energy energy(230);
 SpiState spi_state;
 operation_data::State operation_data_state;
@@ -348,7 +353,7 @@ void SpiState::three_d_auto_set(bool new_state) {
   xSemaphoreGive(miso_semaphore_handle_);
 }
 
-static int validate_frame_short(std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame, uint16_t rx_checksum) {
+static int validate_frame_short(std::span<uint8_t, MHI_FRAME_LEN_SHORT> mosi_frame, uint16_t rx_checksum) {
   if (! validate_signature(mosi_frame[SB0], mosi_frame[SB1], mosi_frame[SB2])) {
     ESP_LOGW(TAG, "wrong MOSI signature. 0x%02x 0x%02x 0x%02x",
                 mosi_frame[0], mosi_frame[1], mosi_frame[2]);
@@ -363,7 +368,7 @@ static int validate_frame_short(std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_fr
   return 0;
 }
 
-static int validate_frame_long(std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame, uint8_t rx_checksum) {
+static int validate_frame_long(std::span<uint8_t, MHI_FRAME_LEN_LONG> mosi_frame, uint8_t rx_checksum) {
   if(mosi_frame[CBL2] != rx_checksum) {
     ESP_LOGW(TAG, "wrong long MOSI checksum. calculated 0x%02x. MOSI[32]:0x%02x",
                 rx_checksum, mosi_frame[CBL2]);
@@ -372,7 +377,7 @@ static int validate_frame_long(std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_fra
   return 0;
 }
 
-static int validate_frame(std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame, uint8_t frame_len) {
+static int validate_frame(std::span<uint8_t, MHI_FRAME_LEN_LONG> mosi_frame, uint8_t frame_len) {
   int err = 0;;
   uint16_t rx_checksum = 0;
   // Frame len has been validated before to only be either MHI_FRAME_LEN_LONG or MHI_FRAME_LEN_SHORT
@@ -380,7 +385,7 @@ static int validate_frame(std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame, u
     switch(i) {
       case CBH:
         // validate checksum short
-        err = validate_frame_short(mosi_frame, rx_checksum);
+        err = validate_frame_short(std::span{mosi_frame}.first<MHI_FRAME_LEN_SHORT>(), rx_checksum);
         if(err) {
           return err;
         }
@@ -408,8 +413,8 @@ static void mhi_poll_task(void *arg)
     bool double_frame = false;
 
     // use 2 recv buffers to be able to check for differences
-    std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame_prev = recvbuf2;
-    std::array<uint8_t, MHI_FRAME_LEN_LONG>& mosi_frame = recvbuf;
+    spi_dma_buf_t& mosi_frame_prev = recvbuf2;
+    spi_dma_buf_t& mosi_frame = recvbuf;
 
     spi_slave_transaction_t spi_slave_trans;
 
@@ -422,9 +427,9 @@ static void mhi_poll_task(void *arg)
     ESP_ERROR_CHECK(gptimer_set_raw_count(cs_timer, 0));
 
     //Set up a transaction of MHI_FRAME_LEN bytes to send/receive
-    spi_slave_trans.length = MHI_FRAME_LEN_LONG*8;
+    spi_slave_trans.length = mosi_frame.size() * 8;
     spi_slave_trans.tx_buffer = &sendbuf;
-    spi_slave_trans.rx_buffer = &mosi_frame;
+    spi_slave_trans.rx_buffer = &recvbuf;
 
     while(1) {
         if (err) {
@@ -463,7 +468,7 @@ static void mhi_poll_task(void *arg)
 
           sendbuf[DB14] = double_frame ? 0x04 : 0;
           if(double_frame) {
-            operation_data_state.on_miso(sendbuf);
+            operation_data_state.on_miso(std::span{sendbuf}.first<33>());
           }
 
           // calculate checksum for the short frame
@@ -529,7 +534,7 @@ static void mhi_poll_task(void *arg)
         const size_t trans_len_bytes = spi_slave_trans.trans_len / 8;
 
         // Validate SPI transaction
-        err = validate_frame(mosi_frame, trans_len_bytes);
+        err = validate_frame(std::span{mosi_frame}.first<MHI_FRAME_LEN_LONG>(), trans_len_bytes);
         if(err != 0) {
           frame_errors++;
           continue;
@@ -550,7 +555,7 @@ static void mhi_poll_task(void *arg)
             ESP_LOGW(TAG, "DB4 error %i", mosi_frame[DB4]);
           }
 
-          operation_data_state.on_mosi(mosi_frame);
+          operation_data_state.on_mosi(std::span{mosi_frame}.first<MHI_FRAME_LEN_LONG>());
 
           if(mosi_frame[DB9] == 0x90 && (mosi_frame[DB6] & 0x80) == 0 && (mosi_frame[DB10] & 0x30) == 0x10) {
             // 29 CT
