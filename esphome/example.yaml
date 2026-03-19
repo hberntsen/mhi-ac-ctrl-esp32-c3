@@ -36,8 +36,6 @@ MhiAcCtrl:
   mosi_pin: GPIO7
   miso_pin: GPIO2
   sclk_pin: GPIO6
-  cs_in_pin: GPIO10
-  cs_out_pin: GPIO9
 
 climate:
   - platform: MhiAcCtrl

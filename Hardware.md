@@ -46,4 +46,4 @@ It was not tested to directly plug the MHI-AC-Ctrl-ESP32-C3 into the AC unit. In
 The JST connector provides +12V. The DC-DC converter [TSR 1-2450](https://www.tracopower.com/products/browse-by-category/find/tsr-1/3/) converts the +12V to +5V.
 
 ## Signal Connection
-The ESP32-C3 SPI signals SCL (SPI clock), MOSI (Master Out Slave In) and MISO (Master In Slave Out) are connected via a voltage level shifter 5V <-> 3.3V with the AC. Direct connection of the signals without a level shifter could damage your ESP32-C3! Note that the CNS connector does not provide a Chip Select signal, this is generated internally on the ESP32-C3 and routed back through IO9 and IO10.
+The ESP32-C3 SPI signals SCL (SPI clock), MOSI (Master Out Slave In) and MISO (Master In Slave Out) are connected via a voltage level shifter 5V <-> 3.3V with the AC. Direct connection of the signals without a level shifter could damage your ESP32-C3! Note that the CNS connector does not provide a Chip Select signal, this is generated internally on the ESP32-C3. We used to physically route an internally generated signal from IO9 and IO10. The physical pins are currently not needed any more.

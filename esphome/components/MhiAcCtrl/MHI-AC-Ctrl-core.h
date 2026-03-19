@@ -37,8 +37,6 @@ struct Config {
   uint8_t mosi_pin;
   uint8_t miso_pin;
   uint8_t sclk_pin;
-  uint8_t cs_in_pin;
-  uint8_t cs_out_pin;
 };
 
 enum class ACPower {
@@ -72,13 +70,7 @@ enum class ACVanesLR {
   Left = 0, LeftCenter = 1, Center = 2, CenterRight = 3, Right = 4, Wide = 5, Spot = 6, Swing = 8
 };
 
-enum class InitError {
-  Ok = 0,
-  CSLoopbackFail
-};
-
-
-InitError init(const Config& config);
+void init(const Config& config);
 
 void active_mode_set(bool state);
 bool active_mode_get();

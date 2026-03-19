@@ -12,6 +12,7 @@
 #include "driver/gptimer.h"
 #include "driver/spi_slave.h"
 #include "driver/gpio.h"
+#include "soc/spi_periph.h"
 
 //#undef LOG_LOCAL_LEVEL
 //#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
@@ -35,7 +36,6 @@ static StackType_t xStack[ STACK_SIZE ];
 static TaskHandle_t mhi_poll_task_handle = NULL;
 
 static bool active_mode = false;
-static gpio_num_t gpio_cs_out;
 
 namespace mhi_ac {
 
@@ -78,8 +78,8 @@ static bool IRAM_ATTR gptimer_isr_callback(gptimer_handle_t timer, const gptimer
     gptimer_set_raw_count(cs_timer, 0);
 
     // Trigger Chip Select low->high->low
-    gpio_set_level(gpio_cs_out, 1);
-    gpio_set_level(gpio_cs_out, 0);
+    esp_rom_gpio_connect_in_signal(GPIO_MATRIX_CONST_ONE_INPUT, spi_periph_signal[RCV_HOST].spics_in, false);
+    esp_rom_gpio_connect_in_signal(GPIO_MATRIX_CONST_ZERO_INPUT, spi_periph_signal[RCV_HOST].spics_in, false);
 
     vTaskNotifyGiveFromISR(mhi_poll_task_handle, &xHigherPriorityTaskWoken);
 
@@ -567,25 +567,9 @@ static void mhi_poll_task(void *arg)
     }
 }
 
-/**
- * Checks whether the GPIO CS loopback works by toggling it a few times.
- */
-static bool check_gpio_cs_loopback(gpio_num_t cs_in_pin) {
-  int on = 0;
-  for(int i = 0; i < 42; i++) {
-    gpio_set_level(gpio_cs_out, on);
-    if(gpio_get_level(cs_in_pin) != on) {
-      return false;
-    }
-    on ^= 1;
-  }
-  return true;
-}
-
-InitError init(const Config& config) {
+void init(const Config& config) {
     esp_err_t err;
 
-    gpio_cs_out = static_cast<gpio_num_t>(config.cs_out_pin);
     spi_state.use_long_frame(config.use_long_frame);
 
     // configuration for the SPI bus
@@ -606,7 +590,7 @@ InitError init(const Config& config) {
 
     // configuration for the SPI slave interface
     spi_slave_interface_config_t slvcfg = {
-        .spics_io_num = config.cs_in_pin,
+        .spics_io_num = -1,
         .flags = SPI_SLAVE_BIT_LSBFIRST,
         .queue_size = 1,
         .mode = 3,                    //CPOL=1, CPHA=1
@@ -617,6 +601,8 @@ InitError init(const Config& config) {
     // initialize SPI slave interface
     err = spi_slave_initialize(RCV_HOST, &buscfg, &slvcfg, SPI_DMA_CH_AUTO);    // can't disable DMA. no comms if you do...
     ESP_ERROR_CHECK(err);
+
+    esp_rom_gpio_connect_in_signal(GPIO_MATRIX_CONST_ONE_INPUT, spi_periph_signal[RCV_HOST].spics_in, false);
 
     // Set up timer
     gptimer_config_t timer_config = {
@@ -660,20 +646,6 @@ io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     gpio_isr_handler_add(static_cast<gpio_num_t>(config.sclk_pin), gpio_isr_handler, NULL);
     gpio_intr_enable(static_cast<gpio_num_t>(config.sclk_pin));
 
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = (1ULL<<gpio_cs_out);
-    io_conf.intr_type =GPIO_INTR_DISABLE;
-    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-    gpio_config(&io_conf);
-
-    if(!check_gpio_cs_loopback(static_cast<gpio_num_t>(config.cs_in_pin))) {
-      return InitError::CSLoopbackFail;
-    }
-
-    gpio_set_level(gpio_cs_out, 1);
-
     mhi_poll_task_handle = xTaskCreateStatic(mhi_poll_task, "mhi_task", STACK_SIZE, NULL, 10, xStack, &xTaskBuffer);
-
-    return InitError::Ok;
 }
 } //namespace mhi_ac
