@@ -42,8 +42,8 @@ namespace mhi_ac {
 // Needs length that is a multiple of 4
 using spi_dma_buf_t = std::array<uint8_t, MHI_FRAME_LEN_LONG + 4 - (MHI_FRAME_LEN_LONG % 4)>;
 
-static DMA_ATTR spi_dma_buf_t sendbuf;
-static DMA_ATTR spi_dma_buf_t recvbuf;
+static DMA_ATTR spi_dma_buf_t miso_buf;
+static DMA_ATTR spi_dma_buf_t mosi_buf;
 
 static uint32_t frame_errors = 0;
 
@@ -411,8 +411,6 @@ static void mhi_poll_task(void *arg)
     esp_err_t err = 0;
     bool double_frame = false;
 
-    spi_dma_buf_t& mosi_frame = recvbuf;
-
     spi_slave_transaction_t spi_slave_trans;
 
     gptimer_event_callbacks_t timer_callbacks = {
@@ -424,9 +422,9 @@ static void mhi_poll_task(void *arg)
     ESP_ERROR_CHECK(gptimer_set_raw_count(cs_timer, 0));
 
     //Set up a transaction of MHI_FRAME_LEN bytes to send/receive
-    spi_slave_trans.length = mosi_frame.size() * 8;
-    spi_slave_trans.tx_buffer = &sendbuf;
-    spi_slave_trans.rx_buffer = &recvbuf;
+    spi_slave_trans.length = mosi_buf.size() * 8;
+    spi_slave_trans.tx_buffer = &miso_buf;
+    spi_slave_trans.rx_buffer = &mosi_buf;
 
     while(1) {
         if (err) {
@@ -438,22 +436,22 @@ static void mhi_poll_task(void *arg)
         double_frame = !double_frame;
 
         if(!active_mode) {
-          std::fill(sendbuf.begin(), sendbuf.end(), 0xff);
+          std::fill(miso_buf.begin(), miso_buf.end(), 0xff);
         } else {
           if (double_frame && xSemaphoreTake(spi_state.miso_semaphore_handle_, 0) == pdTRUE) {
-            std::copy(spi_state.miso_frame_.begin(), spi_state.miso_frame_.end(), sendbuf.begin());
+            std::copy(spi_state.miso_frame_.begin(), spi_state.miso_frame_.end(), miso_buf.begin());
 
             // we never change those, right?
-            //sendbuf[DB10] = 0xff;
-            //sendbuf[DB11] = 0xff;
-            //sendbuf[DB12] = 0xff;
+            //miso_buf[DB10] = 0xff;
+            //miso_buf[DB11] = 0xff;
+            //miso_buf[DB12] = 0xff;
 
             // to set a setting, the same bits are set in the MISO frame
             // that they are located in the MOSI frame. you also need to
             // set a specific 'set bit'. this bit stays set (even in the
             // MOSI frame) until the RC is used. at this point, _all_ set
             // bits are reset to 0 since we just copied all the new
-            // configuration to the sendbuf. if the RC is used, the
+            // configuration to the miso_buf. if the RC is used, the
             // updated setting will appear in the MOSI frame
             spi_state.miso_frame_[DB0] = 0x00;
             spi_state.miso_frame_[DB1] = 0x00;
@@ -463,24 +461,24 @@ static void mhi_poll_task(void *arg)
             xSemaphoreGive(spi_state.miso_semaphore_handle_);
           }
 
-          sendbuf[DB14] = double_frame ? 0x04 : 0;
+          miso_buf[DB14] = double_frame ? 0x04 : 0;
           if(double_frame) {
-            operation_data_state.on_miso(std::span{sendbuf}.first<33>());
+            operation_data_state.on_miso(std::span{miso_buf}.first<33>());
           }
 
           // calculate checksum for the short frame
           uint16_t tx_checksum = 0;
           for (uint8_t byte_cnt = 0; byte_cnt < CBH; byte_cnt++) {
-              tx_checksum += sendbuf[byte_cnt];
+              tx_checksum += miso_buf[byte_cnt];
           }
-          sendbuf[CBH] = tx_checksum>>8;
-          sendbuf[CBL] = tx_checksum;
+          miso_buf[CBH] = tx_checksum>>8;
+          miso_buf[CBL] = tx_checksum;
 
           // Continue calculating for the long frame
           for (uint8_t byte_cnt = CBH; byte_cnt < CBL2; byte_cnt++) {
-            tx_checksum += sendbuf[byte_cnt];
+            tx_checksum += miso_buf[byte_cnt];
           }
-          sendbuf[CBL2] = tx_checksum;
+          miso_buf[CBL2] = tx_checksum;
         }
 
         // The GPIO CLK triggered timer alarm will clear right after a frame. Wait for it so we don't transmit the
@@ -522,7 +520,7 @@ static void mhi_poll_task(void *arg)
         const size_t trans_len_bytes = spi_slave_trans.trans_len / 8;
 
         // Validate SPI transaction
-        err = validate_frame(std::span{mosi_frame}.first<MHI_FRAME_LEN_LONG>(), trans_len_bytes);
+        err = validate_frame(std::span{mosi_buf}.first<MHI_FRAME_LEN_LONG>(), trans_len_bytes);
         if(err != 0) {
           frame_errors++;
           continue;
@@ -531,7 +529,7 @@ static void mhi_poll_task(void *arg)
         // Snapshot data when not in use
         if(xSemaphoreTake(spi_state.snapshot_semaphore_handle_, 0) == pdTRUE) {
           std::ranges::copy(
-              mosi_frame | std::views::take(spi_state.mosi_frame_snapshot_.size()),
+              mosi_buf | std::views::take(spi_state.mosi_frame_snapshot_.size()),
               spi_state.mosi_frame_snapshot_.begin());
           xSemaphoreGive(spi_state.snapshot_semaphore_handle_);
         }
@@ -539,17 +537,17 @@ static void mhi_poll_task(void *arg)
         // We only seem get operation data when double_frame is false
         if(!double_frame){
           // DB4 becomes 1 after a while when active mode is turned off, ignore that
-          if(mosi_frame[DB4] > 0 && !(mosi_frame[DB4] == 1 && !active_mode)) {
-            ESP_LOGW(TAG, "DB4 error %i", mosi_frame[DB4]);
+          if(mosi_buf[DB4] > 0 && !(mosi_buf[DB4] == 1 && !active_mode)) {
+            ESP_LOGW(TAG, "DB4 error %i", mosi_buf[DB4]);
           }
 
-          operation_data_state.on_mosi(std::span{mosi_frame}.first<MHI_FRAME_LEN_LONG>());
+          operation_data_state.on_mosi(std::span{mosi_buf}.first<MHI_FRAME_LEN_LONG>());
 
-          if(mosi_frame[DB9] == 0x90 && (mosi_frame[DB6] & 0x80) == 0 && (mosi_frame[DB10] & 0x30) == 0x10) {
+          if(mosi_buf[DB9] == 0x90 && (mosi_buf[DB6] & 0x80) == 0 && (mosi_buf[DB10] & 0x30) == 0x10) {
             // 29 CT
-            energy.set_current(mosi_frame[DB11]);
-            float current = ((int)mosi_frame[DB11] * 14) / 51.0f;
-            ESP_LOGD(TAG, "Current: %f, raw: %i, *230: %f", current, mosi_frame[DB11], current*230);
+            energy.set_current(mosi_buf[DB11]);
+            float current = ((int)mosi_buf[DB11] * 14) / 51.0f;
+            ESP_LOGD(TAG, "Current: %f, raw: %i, *230: %f", current, mosi_buf[DB11], current*230);
           }
         }
     }
