@@ -16,7 +16,7 @@ Part |Value            |Package                    |comment
 C1   |22µ/25V          |E15-5 (axial)              |consider the polarity
 C2, C3   |100n             |C025-024X044
 U1   |[TSR_1-2450](https://www.aliexpress.com/item/1005004319529660.html)       |TSR-1                      |consider the polarity  <sup>1</sup>
-U2  |[ESP-C3-32S(4M)-KIT](https://www.aliexpress.com/item/1005003152986418.html)    |ESP-C3-32S(4M)-KIT              |consider the polarity
+U2  |[ESP-C3-32S(4M)-KIT](https://nl.aliexpress.com/item/1005002983050962.html)    |ESP-C3-32S(4M)-KIT              |consider the polarity
 U3  |LEVEL-SHIFTER-4CH|LEVEL-SHIFTER-4CH          |consider the polarity
 R1   | 12K        |                      | Optional <sup>2</sup>
 

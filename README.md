@@ -6,7 +6,7 @@ This code is inspired by [@absalom-muc's MHI-AC-Ctrl](https://github.com/absalom
 ## Hardware
 
 ### Officialy supported (tested by @hberntsen):
-* [ESP-C3-32S(4M)-KIT](https://www.aliexpress.com/item/1005003152986418.html). 
+* [ESP-C3-32S(4M)-KIT](https://nl.aliexpress.com/item/1005002983050962.html).
   Requires an additional PCB for the AC interface. See the [kicad folder](kicad) folder for the PCB design (manufactured via [Aisler](https://aisler.net)).
 * ESP32-S3 (design your own PCB). Putting the SPI clock on pins other than 43 (UART TX) [is not stable](https://esp32.com/viewtopic.php?t=47883).
 * 2022 models of these indoor AC units:
