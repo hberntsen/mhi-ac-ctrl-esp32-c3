@@ -80,11 +80,10 @@ sensor:
     climate_current_temperature:
       # Only id, no name so it won't be sent to home assistant as separate sensor
       id: climate_current_temperature
+      accuracy_decimals: 2
       filters:
         # Check for temperature changes only every 10 seconds
         - heartbeat: 10s
-        # Home assistant does not show decimals
-        - round: 0
         # The climate component will only send updates if the value is different
 
     # Operation data based sensors
