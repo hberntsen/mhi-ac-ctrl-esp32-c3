@@ -24,6 +24,6 @@ This code is inspired by [@absalom-muc's MHI-AC-Ctrl](https://github.com/absalom
 
 ## Getting started
 
-This project is used in ESPHome as external component. The [ESPHome documentation](https://esphome.io/guides/getting_started_hassio) will help you getting started with ESPHome. You can base off your configuration from the [`example.yaml`](esphome/example.yaml) included in this repository.
+This project is used in ESPHome as external component. The [ESPHome documentation](https://esphome.io/guides/getting_started_hassio) will help you getting started with ESPHome. You can base off your configuration from the [`example.yaml`](esphome/example.yaml) included in this repository. Once you got that going and want to an external temperature sensor, have a look at [`example-external-sensor.yaml`](esphome/example-external-sensor.yaml).
 
 In general, the latest version of ESPHome should work. See the [build workflow](.github/workflows/build-example.yml#L17) for the latest version of ESPHome that was tested.

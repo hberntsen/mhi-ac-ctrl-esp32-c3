@@ -21,3 +21,6 @@ jobs:
       - name: Compile example
         working-directory: esphome
         run: esphome compile example.yaml
+      - name: Compile example external sensor
+        working-directory: esphome
+        run: esphome compile example-external-sensor.yaml

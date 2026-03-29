@@ -1,0 +1,203 @@
+# For all configuration options, see the example.yaml file. This file only
+# shows what you can do with an external Bluetooth temperature sensor.
+#
+# Compared to some other projects, this project does not alter the external
+# sensor value. It passes the rounded value (0.25 degrees Celsius precision) to
+# the AC. That means all the trickery has to happen in the yaml file, which
+# this example will show.
+substitutions:
+  mhi_device_id: "mhi_ac_example"
+  # Unique device ID in HA
+  device_id: "ac_example"
+  # Unique device name in HA (sensor names will be prefixed by this name)
+  device_name: "AC Example"
+  external_temperature_sensor_id: atc_temperature
+
+esphome:
+  name: ac-example
+  platformio_options:
+    board_build.flash_mode: dio
+
+external_components:
+  - source: components
+# Or, directly refer to the Git repository
+#  - source: github://hberntsen/mhi-ac-ctrl-esp32@master
+
+esp32:
+  board: esp32-c3-devkitm-1
+  # Run CPU at slower speed to save power
+  cpu_frequency: 80MHz
+  framework:
+    type: esp-idf
+    # Add Bluetooth 5 support
+    sdkconfig_options:
+      CONFIG_BT_BLE_50_FEATURES_SUPPORTED: y
+
+esp32_ble_tracker:
+  scan_parameters:
+    active: false
+
+MhiAcCtrl:
+  id: ${mhi_device_id}
+  mosi_pin: GPIO7
+  miso_pin: GPIO2
+  sclk_pin: GPIO6
+  use_long_frame: true
+  # Send the value of this temperature sensor to the AC (degrees Celsius)
+  external_temperature_sensor: ${device_id}_calculated_external_sensor
+
+climate:
+  - platform: MhiAcCtrl
+    mhi_ac_ctrl_id: ${mhi_device_id}
+    id: ${device_id}
+    name: "${device_name}"
+    visual:
+      temperature_step:
+        # Upgrade to 0.5 degrees Celsius, we're adding support for this by
+        # manipulating the external sensor in the lambda later below.
+        target_temperature: 0.5
+        current_temperature: 0.25
+    on_control:
+      - then:
+          - lambda: id(${device_id}_calculated_external_sensor).update();
+
+sensor:
+  - platform: MhiAcCtrl
+    mhi_ac_ctrl_id: ${mhi_device_id}
+    # The current temperature in the climate component will use the filtered
+    # value from this sensor.
+    #
+    # Use case: filtering out internal temperature sensor jitter and overriding
+    # climate temperature with external, when available.
+    climate_current_temperature:
+      # Only id, no name so it won't be sent to home assistant as separate sensor
+      id: climate_current_temperature
+      accuracy_decimals: 2
+      filters:
+        # Override the climate's temperature with our external sensor, if it is
+        # available. Otherwise, our manipulated sensor value is shown on the
+        # Climate card in Home Assistant.
+        - lambda: |-
+            float Troom = id(${external_temperature_sensor_id}).state;
+            if(!isnan(Troom)) {
+              return Troom;
+            }
+            return x;
+        # Check for temperature changes only every 10 seconds
+        - heartbeat: 10s
+        # The climate component will only send updates if the value is different
+
+    # The return_air_temperature sensor will show the external (or internal if
+    # the external sensor is unavailable) temperature value we have sent to the
+    # AC.
+    return_air_temperature:
+      name: Return air temperature
+    # When the setpoint changes, also update the external sensor's value
+    set_temperature:
+      name: Set temperature
+      id: ${device_id}_set_temperature
+      on_value:
+        - then:
+            - lambda: id(${device_id}_calculated_external_sensor).update();
+
+  # Example: use this Bluetooth sensor as external temperature sensor
+  - platform: pvvx_mithermometer
+    mac_address: "AA:BB:CC:DD:EE:FF"
+    temperature:
+      id: atc_temperature
+      name: "ATC Temperature"
+      filters:
+        # Stop using this sensor when it did not update in the last 10 minutes.
+        - timeout: 10min
+        # Filter out 0 degrees, some bug makes it sometimes send 0.
+        - filter_out: 0
+      on_value:
+        - then:
+            - lambda: id(${device_id}_calculated_external_sensor).update();
+
+  - platform: template
+    name: Calculated external sensor
+    id: ${device_id}_calculated_external_sensor
+    unit_of_measurement: "°C"
+    entity_category: diagnostic
+    lambda: |-
+      float Troom = id(${external_temperature_sensor_id}).state;
+      float Tset = id(${device_id}).target_temperature;
+
+      // Use the internal sensor when the external one is not available, or we have no set point
+      if (isnan(Troom) || isnan(Tset)) {
+        return NAN;
+      }
+
+      float TsetInternal = max(18.f, Tset);
+      float TsetReported = id(${device_id}_set_temperature).state;
+
+      // The AC internally won't go lower than 18, support lower temperatures through
+      // increasing the external temperature
+      Troom += TsetInternal - Tset;
+
+      // The AC increases your set point internally. The internal set point is set_temperature in the operation data.
+      // Known reasons for increases:
+      // * The AC internally adds 2 degrees when heating, unless turned off (excessive heating compensation).
+      // * 3D auto heating adds 1 degree
+      //
+      // We undo these compensations, so it will heat to exactly the set point we want
+      if (!isnan(TsetReported)) {
+        Troom += TsetReported - TsetInternal;
+      }
+
+
+      /*
+      Limit the max temperature delta via a slider. When heating/cooling, the
+      AC will see a temperature that is closer to your set point. Some AC
+      models will reduce their power when they are made to believe they are
+      almost there. Some might ramp up since it takes too long to get there. So
+      you need to test with this. You can safely remove this block and the
+      slider if you don't want to use this.
+      */
+      float TmaxDelta = id(${device_id}_max_temperature_delta).state;
+      if (id(${device_id}).mode == climate::CLIMATE_MODE_HEAT) {
+        // Heating: clamp downward only (don't suppress a hot room reading)
+        Troom = max(Troom, TsetReported - TmaxDelta);
+      } else if (id(${device_id}).mode == climate::CLIMATE_MODE_COOL) {
+        // Cooling: clamp upward only (don't suppress a cold room reading)
+        Troom = min(Troom, TsetReported + TmaxDelta);
+      }
+
+      // Use our new calculated value.
+      return Troom;
+
+number:
+  # This slider defines the limit of how much degrees Celsius of a difference
+  # between the external sensor and the AC's setpoint you want to be sent to
+  # the AC. It is used by the calculated external sensor lambda above.
+  #
+  # For example:
+  # * Your external temperature sensor says it is 18 degrees
+  # * You set your AC to 20 degrees in heating mode
+  # * You set this slider to 10 degrees
+  #
+  # Then, the AC will see 18 degrees as room temperature, since 20-18 > 10.
+  #
+  # Suppose you now set this slider to 1.0, the AC will receive 19 degrees room
+  # temperature instead of 18. You might be able to use this to reduce power
+  # consumption and let your room heat/cool more gradually.
+  - platform: template
+    id: ${device_id}_max_temperature_delta
+    name: Max temperature delta
+    min_value: 0
+    max_value: 10
+    step: 0.25
+    initial_value: 2
+    optimistic: true
+    on_value:
+      - then:
+          - lambda: id(${device_id}_calculated_external_sensor).update();
+
+switch:
+  - platform: MhiAcCtrl
+    mhi_ac_ctrl_id: ${mhi_device_id}
+    active_mode:
+      name: Active mode
+      id: ${device_id}_active_mode
+

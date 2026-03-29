@@ -34,6 +34,9 @@ MhiAcCtrl:
   # Optional config, default values listed here
   # Set to false on older AC units that don't support the longer frames
   use_long_frame: true
+  # Send the value of this temperature sensor to the AC (degrees Celsius)
+  # See example-external-sensor.yaml
+  # external_temperature_sensor:
 
 climate:
   - platform: MhiAcCtrl
