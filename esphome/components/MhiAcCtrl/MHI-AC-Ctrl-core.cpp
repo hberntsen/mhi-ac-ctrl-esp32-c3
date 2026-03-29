@@ -32,7 +32,7 @@ using namespace mhi_ac::internal;
 
 static StaticTask_t xTaskBuffer;
 static StackType_t xStack[ STACK_SIZE ];
-static TaskHandle_t mhi_poll_task_handle = NULL;
+static TaskHandle_t mhi_comm_task_handle = NULL;
 
 static bool active_mode = false;
 
@@ -65,7 +65,7 @@ static bool IRAM_ATTR rmt_on_recv_done_callback(rmt_channel_handle_t channel, co
     // Start detecting next SPI clock idle
     rmt_receive(rmt_rx_chan, rmt_buf, sizeof(rmt_buf), &rmt_recv_cfg);
 
-    vTaskNotifyGiveFromISR(mhi_poll_task_handle, &xHigherPriorityTaskWoken);
+    vTaskNotifyGiveFromISR(mhi_comm_task_handle, &xHigherPriorityTaskWoken);
 
     return xHigherPriorityTaskWoken;
 }
@@ -391,7 +391,7 @@ static int validate_frame(std::span<uint8_t, MHI_FRAME_LEN_LONG> mosi_frame, uin
   return err;
 }
 
-static void mhi_poll_task(void *arg)
+static void mhi_comm_task(void *arg)
 {
     esp_err_t err = 0;
     bool double_frame = false;
@@ -599,6 +599,6 @@ void init(const Config& config) {
     io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
     gpio_config(&io_conf);
 
-    mhi_poll_task_handle = xTaskCreateStatic(mhi_poll_task, "mhi_task", STACK_SIZE, NULL, 10, xStack, &xTaskBuffer);
+    mhi_comm_task_handle = xTaskCreateStatic(mhi_comm_task, "mhi_comm_task", STACK_SIZE, NULL, 10, xStack, &xTaskBuffer);
 }
 } //namespace mhi_ac
