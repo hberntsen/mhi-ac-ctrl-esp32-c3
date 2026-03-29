@@ -1,4 +1,4 @@
-# mhi-ac-ctrl-esp32-c3
+# mhi-ac-ctrl-esp32
 Control MHI Airconditioning locally with ESPHome!
 
 This code is inspired by [@absalom-muc's MHI-AC-Ctrl](https://github.com/absalom-muc/MHI-AC-Ctrl), [@mriksman's esp32 homekit implementation](https://github.com/mriksman/esp32_homekit_mhi/blob/e4a8a4382b990c8e64463411c47e911d1741d9d1/main/main.c) and [@ginkage's MHI-AC-Ctrl-ESPHome](https://github.com/ginkage/MHI-AC-Ctrl-ESPHome). Compared to the popular implementation of @absalom-muc and @ginkage, this repository uses the hardware SPI peripheral instead of a software based implementation. That improves reliability and frees up CPU resources for other tasks. 
@@ -8,6 +8,7 @@ This code is inspired by [@absalom-muc's MHI-AC-Ctrl](https://github.com/absalom
 ### Officialy supported (tested by @hberntsen):
 * [ESP-C3-32S(4M)-KIT](https://www.aliexpress.com/item/1005003152986418.html). 
   Requires an additional PCB for the AC interface. See the [kicad folder](kicad) folder for the PCB design (manufactured via [Aisler](https://aisler.net)).
+* ESP32-S3 (design your own PCB). Putting the SPI clock on pins other than 43 (UART TX) [is not stable](https://esp32.com/viewtopic.php?t=47883).
 * 2022 models of these indoor AC units:
   * SRK50ZS-W
   * SRK25ZS-W

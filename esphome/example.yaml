@@ -13,7 +13,7 @@ esphome:
 external_components:
   - source: components
 # Or, directly refer to the Git repository
-#  - source: github://hberntsen/mhi-ac-ctrl-esp32-c3@master
+#  - source: github://hberntsen/mhi-ac-ctrl-esp32@master
 
 esp32:
   board: esp32-c3-devkitm-1
@@ -74,7 +74,7 @@ sensor:
     # will use the filtered value from this sensor.
     #
     # Use case: filtering out temperature jitter. See
-    # https://github.com/hberntsen/mhi-ac-ctrl-esp32-c3/issues/5
+    # https://github.com/hberntsen/mhi-ac-ctrl-esp32/issues/5
     climate_current_temperature:
       # Only id, no name so it won't be sent to home assistant as separate sensor
       id: climate_current_temperature
@@ -225,7 +225,7 @@ switch:
     # An automation blueprint to enable active mode automatically from home
     # assistant is included in the homeassistant directory. Though you can also
     # use the built in ESPHome features to enable this switch automatically.
-    # See https://github.com/hberntsen/mhi-ac-ctrl-esp32-c3/issues/17#issuecomment-2744462292
+    # See https://github.com/hberntsen/mhi-ac-ctrl-esp32/issues/17#issuecomment-2744462292
     active_mode:
       name: ${device_name} Active mode
       id: ${device_id}_active_mode
