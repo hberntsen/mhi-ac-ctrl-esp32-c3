@@ -38,9 +38,9 @@ CONFIG_SCHEMA = cv.All(
             cv.GenerateID(): cv.declare_id(MhiAcCtrl),
             cv.Optional(CONF_EXTERNAL_TEMPERATURE_SENSOR): cv.use_id(sensor.Sensor),
             cv.Optional(CONF_USE_LONG_FRAME, default=True): cv.boolean,
-            cv.Optional(CONF_MOSI_PIN, default="GPIO7"): pins.gpio_input_pin_schema,
-            cv.Optional(CONF_MISO_PIN, default="GPIO2"): pins.gpio_output_pin_schema,
-            cv.Optional(CONF_SCLK_PIN, default="GPIO6"): pins.gpio_input_pin_schema,
+            cv.Optional(CONF_MOSI_PIN): pins.gpio_input_pin_schema,
+            cv.Optional(CONF_MISO_PIN): pins.gpio_output_pin_schema,
+            cv.Optional(CONF_SCLK_PIN): pins.gpio_input_pin_schema,
         }
     ).extend(cv.COMPONENT_SCHEMA)
 )

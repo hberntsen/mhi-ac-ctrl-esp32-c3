@@ -28,14 +28,12 @@ logger:
 
 MhiAcCtrl:
   id: ${mhi_device_id}
-  # Optional config
-  # The default values are:
-
-  # Set to false on older AC units that don't support the longer frames
-  use_long_frame: true
   mosi_pin: GPIO7
   miso_pin: GPIO2
   sclk_pin: GPIO6
+  # Optional config, default values listed here
+  # Set to false on older AC units that don't support the longer frames
+  use_long_frame: true
 
 climate:
   - platform: MhiAcCtrl
