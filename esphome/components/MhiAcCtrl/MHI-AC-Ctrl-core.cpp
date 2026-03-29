@@ -44,7 +44,6 @@ using spi_dma_buf_t = std::array<uint8_t, MHI_FRAME_LEN_LONG + 4 - (MHI_FRAME_LE
 
 static DMA_ATTR spi_dma_buf_t sendbuf;
 static DMA_ATTR spi_dma_buf_t recvbuf;
-static DMA_ATTR spi_dma_buf_t recvbuf2;
 
 static uint32_t frame_errors = 0;
 
@@ -412,8 +411,6 @@ static void mhi_poll_task(void *arg)
     esp_err_t err = 0;
     bool double_frame = false;
 
-    // use 2 recv buffers to be able to check for differences
-    spi_dma_buf_t& mosi_frame_prev = recvbuf2;
     spi_dma_buf_t& mosi_frame = recvbuf;
 
     spi_slave_transaction_t spi_slave_trans;
@@ -515,16 +512,7 @@ static void mhi_poll_task(void *arg)
           }
           continue;
         }
-        // swap buffers
-        if(spi_slave_trans.rx_buffer == &recvbuf) {
-          mosi_frame = recvbuf;
-          mosi_frame_prev = recvbuf2;
-          spi_slave_trans.rx_buffer = &recvbuf2;
-        } else {
-          mosi_frame = recvbuf2;
-          mosi_frame_prev = recvbuf;
-          spi_slave_trans.rx_buffer = &recvbuf;
-        }
+
         // Transaction must be of a supported length
         if(spi_slave_trans.trans_len != MHI_FRAME_LEN_LONG * 8
             && spi_slave_trans.trans_len != MHI_FRAME_LEN_SHORT * 8) {
