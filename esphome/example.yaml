@@ -66,6 +66,10 @@ sensor:
     # switching active mode
     frame_errors:
       name: Frame errors
+      # The frame errors should stay < 10 / day for reliable operation.
+      # This filter prevents spamming Home Assitant in case you have a lot.
+      filters:
+        - throttle: 1min
 
     # Special sensor to filter out bursts of (small) temperature changes. When
     # this sensor is present, the current temperature in the climate component
