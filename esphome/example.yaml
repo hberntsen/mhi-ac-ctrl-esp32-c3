@@ -51,12 +51,12 @@ select:
   - platform: MhiAcCtrl
     mhi_ac_ctrl_id: ${mhi_device_id}
     vanes_ud:
-      name: ${device_name} Vanes Up Down
+      name: Vanes Up Down
       id: ${device_id}_vanes_ud
     # The 3D auto setting and vanes_lr only work when use_long_frame is set to
     # true
     vanes_lr:
-      name: ${device_name} Vanes Left Right
+      name: Vanes Left Right
       id: ${device_id}_vanes_lr
 
 sensor:
@@ -65,7 +65,7 @@ sensor:
     # Counts SPI frames that did not look right. Usually a few at boot or when
     # switching active mode
     frame_errors:
-      name: ${device_name} Frame errors
+      name: Frame errors
 
     # Special sensor to filter out bursts of (small) temperature changes. When
     # this sensor is present, the current temperature in the climate component
@@ -93,7 +93,7 @@ sensor:
     # requests were not answered. It is normal to have up to thousands per day,
     # therefore the sensor is not that useful to include in your yaml.
     operation_data_timeouts:
-      name: ${device_name} operation data timeouts
+      name: Operation data timeouts
       filters:
         - throttle: 5min
 
@@ -102,11 +102,11 @@ sensor:
     # often this happens. Usually, when a normal operation data timeout occurs,
     # we re-request it and that should work, preventing a visible timeout.
     operation_data_visible_timeouts:
-      name: ${device_name} operation data visible timeouts
+      name: Operation data visible timeouts
 
     # In steps of 14/51A
     current:
-      name: ${device_name} current
+      name: Current
 
     # Using the current from the operation data, multiplied by 230V, or the
     # value set using from, i.e. a home assistant voltage sensor. See later in
@@ -116,7 +116,7 @@ sensor:
     # multi-split. This is quite rough anyway due to the step size of the
     # current sensor.
     power:
-      name: ${device_name} power
+      name: Power
     # Integrates the power sensor above into energy usage, as an alternative to
     # the internal sensor. Assumes 5W idle usage. The heavier the AC is used,
     # the less accurate it seems compared to an external power meter (like, the
@@ -125,7 +125,7 @@ sensor:
     # Not sure yet which is more accurate. See the discussion here:
     # https://gathering.tweakers.net/forum/list_message/81683330#81683330
     integrated_total_energy:
-      name: ${device_name} energy
+      name: Energy
       filters:
         - throttle: 60s
 
@@ -135,7 +135,7 @@ sensor:
     # choose a reset cycle. Net consumption, delta values switches off,
     # periodically resetting on.
     energy_used:
-      name: ${device_name} energy used
+      name: Energy used
 
     # The internal target temperature for the AC. This can be different from
     # the target temperature in the climate sensor:
@@ -143,57 +143,57 @@ sensor:
     # * + 2 degrees celcius when heating, unless the built in countermeasure
     #   for excessive temperature rise is used.
     set_temperature:
-      name: ${device_name} set temperature
+      name: Ret temperature
     return_air_temperature:
-      name: ${device_name} return air temperature
+      name: Return air temperature
     # More granular fan speed than we can see in the climate directly
     indoor_fan_speed:
-      name: ${device_name} indoor fan speed
+      name: Indoor fan speed
 
     # 100 hour granularity
     indoor_total_run_hours:
-      name: ${device_name} indoor total run hours
+      name: Indoor total run hours
     compressor_total_run_hours:
-      name: ${device_name} compressor total run hours
+      name: Compressor total run hours
 
     outdoor_air_temperature:
-      name: ${device_name} outdoor air temperature
+      name: Outdoor air temperature
     discharge_pipe_temperature:
-      name: ${device_name} discharge pipe temperature
+      name: Discharge pipe temperature
 
     compressor_protection_state_number:
-      name: ${device_name} compressor protection state number
+      name: Compressor protection state number
     outdoor_fan_speed:
-      name: ${device_name} outdoor fan speed
+      name: Outdoor fan speed
     outdoor_expansion_valve_pulse_rate:
-      name: ${device_name} outdoor expansion valve pulse rate
+      name: Outdoor expansion valve pulse rate
 
 
     # Calculation marked as 'to be confirmed' in mhi-ac-ctrl
     compressor_frequency:
-      name: ${device_name} compressor frequency
+      name: Compressor frequency
     # See https://github.com/ginkage/MHI-AC-Ctrl-ESPHome/issues/145#issuecomment-3078841631
     indoor_capillary_temperature:
-      name: ${device_name} indoor capillary temperature
+      name: Indoor capillary temperature
 
     # These two are marked as only a rough apprximation in mhi-ac-ctrl
     indoor_u_bend_temperature:
-      name: ${device_name} indoor u-bend temperature
+      name: Indoor u-bend temperature
     indoor_suction_header_temperature:
-      name: ${device_name} indoor suction header temperature
+      name: Indoor suction header temperature
 
     # Formula for calculation not known for the following sensors:
     outdoor_heat_exchanger_temperature_1:
-      name: ${device_name} outdoor heat exchanger temperature 1
+      name: Outdoor heat exchanger temperature 1
     compressor_discharge_pipe_super_heat_temperature:
-      name: ${device_name} discharge pipe super heat temperature
+      name: Discharge pipe super heat temperature
 
 binary_sensor:
   - platform: MhiAcCtrl
     mhi_ac_ctrl_id: ${mhi_device_id}
     # Defrosting sensor via operation data
     defrosting:
-      name: ${device_name} defrosting
+      name: Defrosting
 
 #  # For setting the current voltage, so we can calculate the used power
 #  - platform: homeassistant
@@ -225,7 +225,7 @@ switch:
     # use the built in ESPHome features to enable this switch automatically.
     # See https://github.com/hberntsen/mhi-ac-ctrl-esp32/issues/17#issuecomment-2744462292
     active_mode:
-      name: ${device_name} Active mode
+      name: Active mode
       id: ${device_id}_active_mode
 
 status_led:
