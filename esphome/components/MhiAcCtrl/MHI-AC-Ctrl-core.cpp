@@ -9,10 +9,10 @@
 #include <ranges>
 #include <span>
 
-#include "driver/gptimer.h"
 #include "driver/spi_slave.h"
 #include "driver/gpio.h"
 #include "soc/spi_periph.h"
+#include "driver/rmt_rx.h"
 
 //#undef LOG_LOCAL_LEVEL
 //#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
@@ -30,7 +30,6 @@ using namespace mhi_ac::internal;
 #define ESP_INTR_FLAG_DEFAULT       0                                           // default to allocating a non-shared interrupt of level 1, 2 or 3.
 #define STACK_SIZE 2560
 
-gptimer_handle_t cs_timer = NULL;
 static StaticTask_t xTaskBuffer;
 static StackType_t xStack[ STACK_SIZE ];
 static TaskHandle_t mhi_poll_task_handle = NULL;
@@ -45,40 +44,26 @@ using spi_dma_buf_t = std::array<uint8_t, MHI_FRAME_LEN_LONG + 4 - (MHI_FRAME_LE
 static DMA_ATTR spi_dma_buf_t miso_buf;
 static DMA_ATTR spi_dma_buf_t mosi_buf;
 
+static rmt_channel_handle_t rmt_rx_chan;
+static rmt_receive_config_t rmt_recv_cfg = {};
+static rmt_symbol_word_t rmt_buf[SOC_RMT_MEM_WORDS_PER_CHANNEL];
+
 static uint32_t frame_errors = 0;
 
 Energy energy(230);
 SpiState spi_state;
 operation_data::State operation_data_state;
 
-static void IRAM_ATTR gpio_isr_handler(void* arg)
-{
-  uint64_t current_timer_value;
-  // We need to know whether the timer has already been started. If we start it when it is already started, we get the
-  // following in the logs:
-  // > gptimer: gptimer_start(348): timer is not enabled in the logs
-  //
-  // There is no direct API to check the status, so use the raw count instead
-  ESP_ERROR_CHECK(gptimer_get_raw_count(cs_timer, &current_timer_value));
-  if(current_timer_value == 0) {
-    gptimer_start(cs_timer);
-  } else {
-    ESP_ERROR_CHECK(gptimer_set_raw_count(cs_timer, 0));
-  }
-}
-
-static bool IRAM_ATTR gptimer_isr_callback(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata, void *user_ctx)
+static bool IRAM_ATTR rmt_on_recv_done_callback(rmt_channel_handle_t channel, const rmt_rx_done_event_data_t *edata, void *user_ctx)
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
-    // Stop timer, gpio isr will turn it back on
-    gptimer_stop(timer);
-    // Set to 0 to tell the GPIO isr that the timer is not running
-    gptimer_set_raw_count(cs_timer, 0);
 
     // Trigger Chip Select low->high->low
     esp_rom_gpio_connect_in_signal(GPIO_MATRIX_CONST_ONE_INPUT, spi_periph_signal[RCV_HOST].spics_in, false);
     esp_rom_gpio_connect_in_signal(GPIO_MATRIX_CONST_ZERO_INPUT, spi_periph_signal[RCV_HOST].spics_in, false);
+
+    // Start detecting next SPI clock idle
+    rmt_receive(rmt_rx_chan, rmt_buf, sizeof(rmt_buf), &rmt_recv_cfg);
 
     vTaskNotifyGiveFromISR(mhi_poll_task_handle, &xHigherPriorityTaskWoken);
 
@@ -413,18 +398,13 @@ static void mhi_poll_task(void *arg)
 
     spi_slave_transaction_t spi_slave_trans;
 
-    gptimer_event_callbacks_t timer_callbacks = {
-      .on_alarm = gptimer_isr_callback
-    };
-    ESP_ERROR_CHECK(gptimer_register_event_callbacks(cs_timer, &timer_callbacks, NULL));
-    ESP_ERROR_CHECK(gptimer_enable(cs_timer));
-    // Set the count to 0, so the gpio ISR will start the timer
-    ESP_ERROR_CHECK(gptimer_set_raw_count(cs_timer, 0));
-
     //Set up a transaction of MHI_FRAME_LEN bytes to send/receive
     spi_slave_trans.length = mosi_buf.size() * 8;
     spi_slave_trans.tx_buffer = &miso_buf;
     spi_slave_trans.rx_buffer = &mosi_buf;
+
+    // Start RMT receiver. Missed frames from now on will be counted as frame_errors
+    rmt_receive(rmt_rx_chan, rmt_buf, sizeof(rmt_buf), &rmt_recv_cfg);
 
     while(1) {
         if (err) {
@@ -481,23 +461,19 @@ static void mhi_poll_task(void *arg)
           miso_buf[CBL2] = tx_checksum;
         }
 
-        // The GPIO CLK triggered timer alarm will clear right after a frame. Wait for it so we don't transmit the
-        // transaction mid-frame. There is a very small chance that it will still happen in between the check here and
-        // the actual transaction starting.
-        uint64_t current_timer_value;
-        do {
-          uint32_t frames_received = ulTaskNotifyTake( pdTRUE, pdMS_TO_TICKS(10000));
-          if(frames_received == 0) {
-            ESP_LOGE(TAG, "No SPI clock detected");
-            frame_errors += 1;
-            continue;
-          } else if(active_mode && frames_received > 1) {
-            // Add missed frames to frame_errors
-            frame_errors += frames_received - 1;
-            ESP_LOGE(TAG, "Missed %u frames", frames_received - 1);
-          }
-          ESP_ERROR_CHECK(gptimer_get_raw_count(cs_timer, &current_timer_value));
-        } while(current_timer_value != 0);
+        // Wait for clock idle via RMT
+        uint32_t frames_received = ulTaskNotifyTake( pdTRUE, pdMS_TO_TICKS(10000));
+        if(frames_received == 0) {
+          // ulTaskNotifyTake timed out
+          ESP_LOGE(TAG, "No SPI clock detected");
+          frame_errors += 1;
+          continue;
+        } else if(active_mode && frames_received > 1) {
+          // Add missed frames to frame_errors
+          frame_errors += frames_received - 1;
+          ESP_LOGE(TAG, "Missed %u frames", frames_received - 1);
+        }
+
         // We're ready, wait on the SPI transaction to happen
         err = spi_slave_transmit(RCV_HOST, &spi_slave_trans, pdMS_TO_TICKS(10000));
         if(err) {
@@ -588,49 +564,40 @@ void init(const Config& config) {
     err = spi_slave_initialize(RCV_HOST, &buscfg, &slvcfg, SPI_DMA_CH_AUTO);    // can't disable DMA. no comms if you do...
     ESP_ERROR_CHECK(err);
 
+    // Initialise CS to 1 (deselect ourselves as peripheral). RMT interrupt will handle CS after this
     esp_rom_gpio_connect_in_signal(GPIO_MATRIX_CONST_ONE_INPUT, spi_periph_signal[RCV_HOST].spics_in, false);
 
-    // Set up timer
-    gptimer_config_t timer_config = {
-      .clk_src = GPTIMER_CLK_SRC_DEFAULT,
-      .direction = GPTIMER_COUNT_UP,
-      .resolution_hz = 1000000, // Plenty of resolution to encode a rough 20ms ;)
+    // Set up RMT, used to detect clock idle for generating our own chip select signal
+    rmt_rx_channel_config_t rmt_rx_cfg = {};
+    rmt_rx_cfg.gpio_num          = static_cast<gpio_num_t>(config.sclk_pin);
+    rmt_rx_cfg.clk_src           = RMT_CLK_SRC_DEFAULT;
+    rmt_rx_cfg.resolution_hz     = 1000000;
+    rmt_rx_cfg.mem_block_symbols = SOC_RMT_MEM_WORDS_PER_CHANNEL;
+    ESP_ERROR_CHECK(rmt_new_rx_channel(&rmt_rx_cfg, &rmt_rx_chan));
+
+    rmt_rx_event_callbacks_t rmt_cbs = {
+        .on_recv_done = rmt_on_recv_done_callback,
     };
-    ESP_ERROR_CHECK(gptimer_new_timer(&timer_config, &cs_timer));
-    gptimer_alarm_config_t timer_alarm_config = {
-      // Configure the alarm value (in milliseconds) and the interrupt on alarm. there is a gap between each frame of
-      // 40ms with short frames and about 33ms with long frames.
-      // We set the alarm to 1ms, so it is triggering after 1ms of no clock. We receive about 2 bytes per millisecond.
-      // This tolerance should be enough and will give us maximum time to process this frame and prepare the next.
-      //
-      // Once the alarm triggers, we toggle the CS line to mark the end/start of a SPI transaction to the hardware, as
-      // it won't work without. The GPIO interrupt below resets this timer every time the clock signal is low. When the
-      // SPI transaction is complete, the master leaves the clock pin high, setting of the alarm and us toggling the
-      // pin.
-      .alarm_count = 1 * (timer_config.resolution_hz / 1000),
-      .reload_count = 0,
-      .flags = {
-        // We manually reload based on the clock signal we get from the AC
-        .auto_reload_on_alarm = false,
-      }
-    };
-    ESP_ERROR_CHECK(gptimer_set_alarm_action(cs_timer, &timer_alarm_config));
-    // The ISR uses the counter value to determine whether it is already running. The ISR will probably trigger before
-    // we are ready in the mhi_poll_task, so set a non-zero value so it assumes it has already been started. The
-    // mhi_poll_task will prepare the timer with a 0 count.
-    ESP_ERROR_CHECK(gptimer_set_raw_count(cs_timer, timer_config.resolution_hz));
+    ESP_ERROR_CHECK(rmt_rx_register_event_callbacks(rmt_rx_chan, &rmt_cbs, NULL));
+
+    ESP_ERROR_CHECK(rmt_enable(rmt_rx_chan));
+
+    // Configure the RMT to trigger an interrupt after the clock is idle. The clock is idle between each frame of 40 ms
+    // with short frames and about 33ms with long frames.
+    // We set the max signal range to 1ms, so it is triggering after 1ms of no clock. We receive about 2 bytes per
+    // millisecond. This tolerance should be enough and will give us maximum time to process this frame and prepare the
+    // next.
+    // In the interrupt of rmt.cbs_on_recv_done, we toggle the CS line internally to mark the end/start of an SPI
+    // transaction to the hardware, as it won't work without.
+    rmt_recv_cfg.signal_range_max_ns = 1000000;
 
     gpio_config_t io_conf = {};
+    // Make sure the pin is configured as input only
     io_conf.mode = GPIO_MODE_INPUT;
     io_conf.pin_bit_mask = (1ULL<<config.sclk_pin);
-io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    io_conf.pull_up_en = GPIO_PULLUP_ENABLE;                                     // required to prevent abort() caused by floating pin when daughtboard not connected
-    io_conf.intr_type = GPIO_INTR_NEGEDGE;
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
     gpio_config(&io_conf);
-
-    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
-    gpio_isr_handler_add(static_cast<gpio_num_t>(config.sclk_pin), gpio_isr_handler, NULL);
-    gpio_intr_enable(static_cast<gpio_num_t>(config.sclk_pin));
 
     mhi_poll_task_handle = xTaskCreateStatic(mhi_poll_task, "mhi_task", STACK_SIZE, NULL, 10, xStack, &xTaskBuffer);
 }

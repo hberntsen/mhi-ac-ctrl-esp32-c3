@@ -1,7 +1,8 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.const import CONF_ID
-from esphome.components import climate, sensor
+from esphome.components import esp32, esp32_rmt, climate, sensor
+from esphome.components.esp32 import include_builtin_idf_component
 from esphome import pins
 
 AUTO_LOAD = ["sensor", "climate"]
@@ -27,18 +28,28 @@ TYPES = [
     CONF_SCLK_PIN,
 ]
 
-CONFIG_SCHEMA = cv.Schema(
-    {
-        cv.GenerateID(): cv.declare_id(MhiAcCtrl),
-        cv.Optional(CONF_EXTERNAL_TEMPERATURE_SENSOR): cv.use_id(sensor.Sensor),
-        cv.Optional(CONF_USE_LONG_FRAME, default=True): cv.boolean,
-        cv.Optional(CONF_MOSI_PIN, default="GPIO7"): pins.gpio_input_pin_schema,
-        cv.Optional(CONF_MISO_PIN, default="GPIO2"): pins.gpio_output_pin_schema,
-        cv.Optional(CONF_SCLK_PIN, default="GPIO6"): pins.gpio_input_pin_schema,
-    }
-).extend(cv.COMPONENT_SCHEMA)
+CONFIG_SCHEMA = cv.All(
+    esp32.only_on_variant(
+        unsupported=list(esp32_rmt.VARIANTS_NO_RMT),
+        msg_prefix="MHI-AC-CTRL",
+    ),
+    cv.Schema(
+        {
+            cv.GenerateID(): cv.declare_id(MhiAcCtrl),
+            cv.Optional(CONF_EXTERNAL_TEMPERATURE_SENSOR): cv.use_id(sensor.Sensor),
+            cv.Optional(CONF_USE_LONG_FRAME, default=True): cv.boolean,
+            cv.Optional(CONF_MOSI_PIN, default="GPIO7"): pins.gpio_input_pin_schema,
+            cv.Optional(CONF_MISO_PIN, default="GPIO2"): pins.gpio_output_pin_schema,
+            cv.Optional(CONF_SCLK_PIN, default="GPIO6"): pins.gpio_input_pin_schema,
+        }
+    ).extend(cv.COMPONENT_SCHEMA)
+)
+
 
 async def to_code(config):
+    # Re-enable ESP-IDF's RMT driver (excluded by default to save compile time)
+    include_builtin_idf_component("esp_driver_rmt")
+
     config_struct = cg.StructInitializer(
         ConfigStruct,
         ("use_long_frame", config[CONF_USE_LONG_FRAME]),

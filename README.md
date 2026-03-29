@@ -18,6 +18,9 @@ This code is inspired by [@absalom-muc's MHI-AC-Ctrl](https://github.com/absalom
 * The ESP32 [has been reported to work](https://github.com/hberntsen/mhi-ac-ctrl-esp32-c3/issues/12#issuecomment-2594627493). Make sure you use the right pins, as discussed in [#11](https://github.com/hberntsen/mhi-ac-ctrl-esp32-c3/issues/11).
 * The AC units listed at https://github.com/absalom-muc/MHI-AC-Ctrl?tab=readme-ov-file#prerequisites should work. Some older units have to use the `use_long_frame: false` setting.
 
+### Not supported
+[ESP32 chips without RMT peripheral](https://github.com/esphome/esphome/blob/dev/esphome/components/esp32_rmt/__init__.py#L7). At the moment of writing that's the ESP32-C2 and ESP32-C61. The RMT is used to derive an SPI CS signal from the clock. Users of these chips might try an older version of the code, i.e. commit 3ddb8cb, that uses timers and interrupts for this.
+
 ## Getting started
 
 This project is used in ESPHome as external component. The [ESPHome documentation](https://esphome.io/guides/getting_started_hassio) will help you getting started with ESPHome. You can base off your configuration from the [`example.yaml`](esphome/example.yaml) included in this repository.
