@@ -11,6 +11,7 @@
 
 #include "driver/spi_slave.h"
 #include "driver/gpio.h"
+#include "driver/gpio_filter.h"
 #include "soc/spi_periph.h"
 #include "driver/rmt_rx.h"
 
@@ -598,6 +599,17 @@ void init(const Config& config) {
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
     gpio_config(&io_conf);
+
+#if SOC_GPIO_SUPPORT_PIN_GLITCH_FILTER
+    // No known cases where this made a difference.
+    // Shouldn't hurt to enable either
+    gpio_pin_glitch_filter_config_t clk_glitch_filter = {
+        .clk_src = GLITCH_FILTER_CLK_SRC_DEFAULT,
+        .gpio_num = static_cast<gpio_num_t>(config.sclk_pin),
+    };
+    gpio_glitch_filter_handle_t clk_glitch_filter_handle;
+    ESP_ERROR_CHECK(gpio_new_pin_glitch_filter(&clk_glitch_filter, &clk_glitch_filter_handle));
+#endif
 
     mhi_comm_task_handle = xTaskCreateStatic(mhi_comm_task, "mhi_comm_task", STACK_SIZE, NULL, 10, xStack, &xTaskBuffer);
 }
