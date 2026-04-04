@@ -420,25 +420,9 @@ static void mhi_comm_task(void *arg)
           std::fill(miso_buf.begin(), miso_buf.end(), 0xff);
         } else {
           if (double_frame && xSemaphoreTake(spi_state.miso_semaphore_handle_, 0) == pdTRUE) {
+            // Copy the changed settings into the miso_buf. Will be cleared from the spi_state on a successful
+            // transaction
             std::copy(spi_state.miso_frame_.begin(), spi_state.miso_frame_.end(), miso_buf.begin());
-
-            // we never change those, right?
-            //miso_buf[DB10] = 0xff;
-            //miso_buf[DB11] = 0xff;
-            //miso_buf[DB12] = 0xff;
-
-            // to set a setting, the same bits are set in the MISO frame
-            // that they are located in the MOSI frame. you also need to
-            // set a specific 'set bit'. this bit stays set (even in the
-            // MOSI frame) until the RC is used. at this point, _all_ set
-            // bits are reset to 0 since we just copied all the new
-            // configuration to the miso_buf. if the RC is used, the
-            // updated setting will appear in the MOSI frame
-            spi_state.miso_frame_[DB0] = 0x00;
-            spi_state.miso_frame_[DB1] = 0x00;
-            spi_state.miso_frame_[DB2] = 0x00;
-            spi_state.miso_frame_[DB16] = 0x00;
-            spi_state.miso_frame_[DB17] = 0x00;
             xSemaphoreGive(spi_state.miso_semaphore_handle_);
           }
 
@@ -501,6 +485,21 @@ static void mhi_comm_task(void *arg)
         if(err != 0) {
           frame_errors++;
           continue;
+        }
+
+        if (active_mode && double_frame && xSemaphoreTake(spi_state.miso_semaphore_handle_, 0) == pdTRUE) {
+          // Successful SPI transaction. reset pending changes
+
+          // Reset all indices we use to set settings, except DB3 (external temperature sensor)
+          constexpr std::array<size_t, 5> indices_to_erase = {DB0, DB1, DB2, DB16, DB17};
+          for(const size_t &index : indices_to_erase) {
+            // Only reset when it has not changed since we've copied it into this miso_buf.
+            if(spi_state.miso_frame_[index] == miso_buf[index]) {
+              spi_state.miso_frame_[index] = 0x00;
+            }
+          }
+
+          xSemaphoreGive(spi_state.miso_semaphore_handle_);
         }
 
         // Snapshot data when not in use
