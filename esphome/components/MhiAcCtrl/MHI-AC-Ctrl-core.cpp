@@ -487,14 +487,16 @@ static void mhi_comm_task(void *arg)
           continue;
         }
 
-        if (active_mode && double_frame && xSemaphoreTake(spi_state.miso_semaphore_handle_, 0) == pdTRUE) {
+        if (double_frame && xSemaphoreTake(spi_state.miso_semaphore_handle_, 0) == pdTRUE) {
           // Successful SPI transaction. reset pending changes
 
           // Reset all indices we use to set settings, except DB3 (external temperature sensor)
           constexpr std::array<size_t, 5> indices_to_erase = {DB0, DB1, DB2, DB16, DB17};
           for(const size_t &index : indices_to_erase) {
-            // Only reset when it has not changed since we've copied it into this miso_buf.
-            if(spi_state.miso_frame_[index] == miso_buf[index]) {
+            // When active_mode is off, always clear settings to prevent very old settings being done later when active
+            // mode is activated. Otherwise, only reset when it has not changed since we've copied it into this
+            // miso_buf. Since it is possible that settings have changed in between.
+            if(!active_mode || spi_state.miso_frame_[index] == miso_buf[index]) {
               spi_state.miso_frame_[index] = 0x00;
             }
           }
