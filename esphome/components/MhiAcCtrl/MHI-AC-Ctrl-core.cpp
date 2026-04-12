@@ -412,6 +412,8 @@ static void mhi_comm_task(void *arg)
             ESP_LOGW(TAG, "error %i . trans len: %i", err, spi_slave_trans.trans_len);
             frame_errors++;
         }
+        err = 0;
+
         double_frame = !double_frame;
 
         if(!active_mode) {
