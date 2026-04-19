@@ -190,7 +190,7 @@ void SpiState::fan_set(ACFan fan) {
 }
 
 ACFan SpiState::fan_get() const {
-  uint8_t fan_value = this->mosi_frame_snapshot_[DB1] & FAN_MASK |
+  uint8_t fan_value = (this->mosi_frame_snapshot_[DB1] & FAN_MASK) |
     (this->mosi_frame_snapshot_[DB6] & FAN_DB6_MASK) >> 4;
   switch(fan_value) {
     case (uint8_t) ACFan::speed_1:
