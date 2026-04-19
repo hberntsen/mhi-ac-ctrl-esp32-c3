@@ -538,7 +538,7 @@ protected:
           if(fan_mode == custom_fan_ultra_low) {
             mhi_ac::spi_state.fan_set(mhi_ac::ACFan::speed_1);
           } else {
-              ESP_LOGW(TAG, "Unsupported custom fan mode: %s", fan_mode);
+              ESP_LOGW(TAG, "Unsupported custom fan mode: %s", fan_mode.c_str());
           }
         } else if (call.get_fan_mode().has_value()) {
           auto fan_mode = *call.get_fan_mode();
