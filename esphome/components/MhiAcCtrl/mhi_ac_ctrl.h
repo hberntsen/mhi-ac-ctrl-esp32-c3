@@ -243,6 +243,8 @@ public:
 
     void setup() override
     {
+        this->set_supported_custom_fan_modes({ custom_fan_ultra_low });
+
         if(this->operation_data_visible_timeouts_sensor_) {
           this->operation_data_visible_timeouts_sensor_->publish_state(0);
         }
@@ -570,7 +572,6 @@ protected:
         traits.set_visual_max_temperature(this->maximum_temperature_);
         traits.set_visual_temperature_step(this->temperature_step_);
         traits.set_visual_current_temperature_step(0.25);
-        traits.set_supported_custom_fan_modes({ custom_fan_ultra_low });
         traits.set_supported_fan_modes({ CLIMATE_FAN_LOW, CLIMATE_FAN_MEDIUM, CLIMATE_FAN_HIGH, CLIMATE_FAN_AUTO });
         //traits.set_supported_swing_modes({ CLIMATE_SWING_VERTICAL });
         return traits;
