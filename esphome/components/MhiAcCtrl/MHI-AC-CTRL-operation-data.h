@@ -74,7 +74,7 @@ namespace operation_data {
     /// Called when the request was answered
     void set_internal(Tinternal new_value) {
       int64_t new_age = esp_timer_get_time();
-      ESP_LOGD("MHI-AC-CTRL-Operation-Data", "Operdata %s request fulfilled after %u", this->name(), new_age - this->age);
+      ESP_LOGD("MHI-AC-CTRL-Operation-Data", "Operdata %s request fulfilled after " PRId64, this->name(), new_age - this->age);
       if(new_value != last_value || !this->has_value()) {
         this->changed = true;
         this->last_value = new_value;
