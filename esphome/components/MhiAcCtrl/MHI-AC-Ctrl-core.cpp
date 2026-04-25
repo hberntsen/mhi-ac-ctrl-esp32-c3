@@ -292,7 +292,7 @@ void SpiState::vanes_updown_set(ACVanesUD new_state) {
 
 bool SpiState::vanes_leftright_changed() const {
   return (this->mosi_frame_snapshot_[DB16] & 0x07) != (this->mosi_frame_snapshot_prev_[DB16] & 0x07) ||
-    (this->mosi_frame_snapshot_[DB17] & 0x01) != (this->mosi_frame_snapshot_[DB17] & 0x01);
+    (this->mosi_frame_snapshot_[DB17] & 0x01) != (this->mosi_frame_snapshot_prev_[DB17] & 0x01);
 }
 
 ACVanesLR SpiState::vanes_leftright_get() const {
