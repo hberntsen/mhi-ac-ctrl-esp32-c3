@@ -193,7 +193,6 @@ public:
     void add_energy(uint64_t additional_energy) {
         bool exchanged;
         uint64_t new_total;
-        uint64_t current_total;
         do {
             uint64_t current_total = total_energy.load();
             new_total = current_total + additional_energy;
