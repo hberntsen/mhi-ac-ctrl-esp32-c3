@@ -347,7 +347,7 @@ static int validate_frame_short(std::span<uint8_t, MHI_FRAME_LEN_SHORT> mosi_fra
                 mosi_frame[0], mosi_frame[1], mosi_frame[2]);
 
     return -1;
-  } else if ( (mosi_frame[CBH] != (rx_checksum>>8 & 0xff)) | (mosi_frame[CBL] != (rx_checksum & 0xff)) ) {
+  } else if ( (mosi_frame[CBH] != (rx_checksum>>8 & 0xff)) || (mosi_frame[CBL] != (rx_checksum & 0xff)) ) {
     ESP_LOGW(TAG, "wrong short MOSI checksum. calculated 0x%04x. MOSI[18]:0x%02x MOSI[19]:0x%02x",
                 rx_checksum, mosi_frame[CBH], mosi_frame[CBL]);
 
