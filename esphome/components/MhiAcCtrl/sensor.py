@@ -147,7 +147,7 @@ CONFIG_SCHEMA = cv.All(
                 device_class=DEVICE_CLASS_TEMPERATURE,
                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
                 icon=ICON_THERMOMETER,
-                unit_of_measurement=UNIT_EMPTY,
+                unit_of_measurement=UNIT_CELSIUS,
             ),
             cv.Optional(CONF_INDOOR_SUCTION_HEADER_TEMPERATURE): sensor.sensor_schema(
                 accuracy_decimals=2,
