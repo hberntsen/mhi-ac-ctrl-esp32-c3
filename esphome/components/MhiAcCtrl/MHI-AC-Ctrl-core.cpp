@@ -279,8 +279,10 @@ void SpiState::vanes_updown_set(ACVanesUD new_state) {
     return;
 
   xSemaphoreTake(this->miso_semaphore_handle_, portMAX_DELAY);
+  // Clear previous settings
   this->miso_frame_[DB0] &= ~0x40;
-  this->miso_frame_[DB1] &= ~0x70;
+  this->miso_frame_[DB1] &= ~0xb0;
+
   this->miso_frame_[DB0] |= 0x80; // Vanes set
   if(new_state == ACVanesUD::Swing) {
       this->miso_frame_[DB0] |= 0x40; // Enable swing
