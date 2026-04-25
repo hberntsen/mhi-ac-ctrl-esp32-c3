@@ -1,6 +1,3 @@
-// MHI-AC-Ctrol-core
-// implements the core functions (read & write SPI)
-
 #include "MHI-AC-Ctrl-core.h"
 
 #include <math.h>
