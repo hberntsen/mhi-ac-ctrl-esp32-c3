@@ -366,7 +366,7 @@ static int validate_frame_long(std::span<uint8_t, MHI_FRAME_LEN_LONG> mosi_frame
 }
 
 static int validate_frame(std::span<uint8_t, MHI_FRAME_LEN_LONG> mosi_frame, uint8_t frame_len) {
-  int err = 0;;
+  int err = 0;
   uint16_t rx_checksum = 0;
   // Frame len has been validated before to only be either MHI_FRAME_LEN_LONG or MHI_FRAME_LEN_SHORT
   for (uint8_t i = 0; i < frame_len; i++) {
