@@ -617,6 +617,7 @@ void init(const Config& config) {
     };
     gpio_glitch_filter_handle_t clk_glitch_filter_handle;
     ESP_ERROR_CHECK(gpio_new_pin_glitch_filter(&clk_glitch_filter, &clk_glitch_filter_handle));
+    ESP_ERROR_CHECK(gpio_glitch_filter_enable(clk_glitch_filter_handle));
 #endif
 
     mhi_comm_task_handle = xTaskCreateStatic(mhi_comm_task, "mhi_comm_task", STACK_SIZE, NULL, 10, xStack, &xTaskBuffer);
