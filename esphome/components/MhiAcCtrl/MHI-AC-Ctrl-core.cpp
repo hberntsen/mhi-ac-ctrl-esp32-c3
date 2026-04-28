@@ -609,8 +609,7 @@ void init(const Config& config) {
     gpio_config(&io_conf);
 
 #if SOC_GPIO_SUPPORT_PIN_GLITCH_FILTER
-    // No known cases where this made a difference.
-    // Shouldn't hurt to enable either
+    // Reported in issue #33 that this helps reducing frame errors
     gpio_pin_glitch_filter_config_t clk_glitch_filter = {
         .clk_src = GLITCH_FILTER_CLK_SRC_DEFAULT,
         .gpio_num = static_cast<gpio_num_t>(config.sclk_pin),
