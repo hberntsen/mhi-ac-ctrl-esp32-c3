@@ -1,16 +1,25 @@
 # Hardware
 
-## Schematic
+As described in the the [readme](README.md), this project officially supports the UAC and our DIY ESP32-C3 board.
+
+## TinyTronics Universal Air Conditioning Controller
+The [Universal Air Conditioning Controller](https://www.tinytronics.nl/en/development-boards/microcontroller-boards/with-wi-fi/universal-air-conditioning-controller-esp32-s3) + [JST cable](https://www.tinytronics.nl/en/cables-and-connectors/cables-and-adapters/jst-compatible/jst-xh-female-to-dupont-female-compatible-cable-5p-15cm) and soldering them together will be enough to get you going.
+
+Note that board version <= 1.2 is known for generating some rate of frame errors. Users [reported](https://github.com/ginkage/MHI-AC-Ctrl-ESPHome/issues/196) it regardless works fine for them. This is because this project automatically retransmits commands when a frame error occurs. Version 1.2 of the board can be modified to 0 frame errors by adding a 500 ohm resistor in between a GPIO on the bottom and the source pin of the MOSFET closest to the LED. The GPIO pin at the bottom should be used for the CLK. This is what @hberntsen uses and communicated to TinyTronics so they can improve it in a newer version.
+
+## DIY ESP32-C3 board
+
+### Schematic
 ![schematic](images/MHI-AC-Ctrl_Schematic.png)
 
-## PCB (KiCad)
+### PCB (KiCad)
 <img src="images/PCB_top.PNG" width=450/>
 <img src="images/PCB_bottom.PNG" width=450/>
 
 You find the KiCad schematic and the layout in the [kicad folder](kicad). I used this KiCad project for the PCB order at [Aisler](https://aisler.net).
 
 
-## Bill of Material
+### Bill of Material
 Part |Value            |Package                    |comment
 ---- | ----            |----                       |-----
 C1   |22µ/25V          |E15-5 (axial)              |consider the polarity
@@ -25,14 +34,14 @@ R1   | 12K        |                      | Optional <sup>2</sup>
 
 <sup>2</sup>The documentation of AI-Thinker says this one should be connected, though the USB-Serial chip already pulls this pin.
 
-## Assembled PCB
+### Assembled PCB
 The following photos show the assembled PCB
 
 <img src="images/Assembled-Board-top1.jpg" width=300/>
 <img src="images/before-mount.jpg" width=300/>
 <img src="images/Board-plugged.jpg" width=300/>
 
-## Connector
+### Connector
 The AC provides the signals via the CNS connector. It has 5 pins with a pitch of 2.5 mm. It is out of the [XH series from JST](http://www.jst-mfg.com/product/detail_e.php?series=277). The position of the connector is visible on the following photo of the AC indoor unit PCB.
 ![Indoor PCB](images/SRK-PCB.jpg)
 
@@ -42,8 +51,8 @@ It was not tested to directly plug the MHI-AC-Ctrl-ESP32-C3 into the AC unit. In
 
 :warning: **Opening of the indoor unit should be done by a qualified professional because faulty handling may cause leakage of water, electric shock or fire!** :warning:
 
-## Power Supply
+### Power Supply
 The JST connector provides +12V. The DC-DC converter [TSR 1-2450](https://www.tracopower.com/products/browse-by-category/find/tsr-1/3/) converts the +12V to +5V.
 
-## Signal Connection
+### Signal Connection
 The ESP32-C3 SPI signals SCL (SPI clock), MOSI (Master Out Slave In) and MISO (Master In Slave Out) are connected via a voltage level shifter 5V <-> 3.3V with the AC. Direct connection of the signals without a level shifter could damage your ESP32-C3! Note that the CNS connector does not provide a Chip Select signal, this is generated internally on the ESP32-C3. We used to physically route an internally generated signal from IO9 and IO10. The physical pins are currently not needed any more.

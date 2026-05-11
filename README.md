@@ -1,14 +1,14 @@
 # mhi-ac-ctrl-esp32
-Control MHI Airconditioning locally with ESPHome!
+Control Mitsubishi Heavy Industries Airconditioning locally with ESPHome!
 
-This code is inspired by [@absalom-muc's MHI-AC-Ctrl](https://github.com/absalom-muc/MHI-AC-Ctrl), [@mriksman's esp32 homekit implementation](https://github.com/mriksman/esp32_homekit_mhi/blob/e4a8a4382b990c8e64463411c47e911d1741d9d1/main/main.c) and [@ginkage's MHI-AC-Ctrl-ESPHome](https://github.com/ginkage/MHI-AC-Ctrl-ESPHome). Compared to the popular implementation of @absalom-muc and @ginkage, this repository uses the hardware SPI peripheral instead of a software based implementation. That improves reliability and frees up CPU resources for other tasks. 
+This code is inspired by [@absalom-muc's MHI-AC-Ctrl](https://github.com/absalom-muc/MHI-AC-Ctrl), [@mriksman's esp32 homekit implementation](https://github.com/mriksman/esp32_homekit_mhi/blob/e4a8a4382b990c8e64463411c47e911d1741d9d1/main/main.c) and [@ginkage's MHI-AC-Ctrl-ESPHome](https://github.com/ginkage/MHI-AC-Ctrl-ESPHome). Compared to the popular implementation of @absalom-muc and @ginkage, this project uses the hardware SPI peripheral instead of a software based implementation. That improves reliability and frees up CPU resources for other tasks. 
 
 ## Hardware
 
 ### Officialy supported (tested by @hberntsen):
 * [ESP-C3-32S(4M)-KIT](https://nl.aliexpress.com/item/1005002983050962.html).
   Requires an additional PCB for the AC interface. See the [kicad folder](kicad) folder for the PCB design (manufactured via [Aisler](https://aisler.net)).
-* ESP32-S3 (design your own PCB).
+* [Universal Air Conditioning Controller](https://www.tinytronics.nl/en/development-boards/microcontroller-boards/with-wi-fi/universal-air-conditioning-controller-esp32-s3) + [JST cable](https://www.tinytronics.nl/en/cables-and-connectors/cables-and-adapters/jst-compatible/jst-xh-female-to-dupont-female-compatible-cable-5p-15cm)
 * 2022 models of these indoor AC units:
   * SRK50ZS-W
   * SRK25ZS-W
@@ -16,6 +16,7 @@ This code is inspired by [@absalom-muc's MHI-AC-Ctrl](https://github.com/absalom
 ### Community supported:
 * [ESP32-C6](https://github.com/hberntsen/mhi-ac-ctrl-esp32-c3/pull/25)
 * Other ESP32-C3 boards (e.g. [ESP32-C3 super mini](https://github.com/xangin/mhi-ac-ctrl-esp32-c3/blob/master/Hardware.md)).
+* Other ESP32-S3 boards should work, since the Universal Air Controller has one.
 * The ESP32 [has been reported to work](https://github.com/hberntsen/mhi-ac-ctrl-esp32-c3/issues/12#issuecomment-2594627493). Make sure you use the right pins, as discussed in [#11](https://github.com/hberntsen/mhi-ac-ctrl-esp32-c3/issues/11).
 * The AC units listed at https://github.com/absalom-muc/MHI-AC-Ctrl?tab=readme-ov-file#prerequisites should work. Some older units have to use the `use_long_frame: false` setting.
 
